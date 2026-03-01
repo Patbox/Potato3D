@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "softwaregl",
+	"version": "${version}",
+	"name": "SoftwareGL",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"authors": [
+		"Patbox"
+	],
+	"contact": {
+		"homepage": "https://pb4.eu",
+		"sources": "https://github.com/Patbox/SoftwareGL"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/softwaregl/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"eu.pb4.softwaregl.SoftwareGL"
+		]
+	},
+	"mixins": [
+		"softwaregl.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~26.1-",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
