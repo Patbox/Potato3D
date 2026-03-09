@@ -742,18 +742,18 @@ public class SoftRenderPass implements RenderPassBackend {
                 beta *= totalArea;
                 gamma *= totalArea;
 
-                alpha *= vec0.w;
-                beta *= vec1.w;
-                gamma *= vec2.w;
-                var invW = 1 / (alpha + beta + gamma);
-
-                var z = (alpha * vec0.z + beta * vec1.z + gamma * vec2.z) * invW;
+                var z = (alpha * vec0.z + beta * vec1.z + gamma * vec2.z);
 
                 if (this.limitDepth && (z < -1 || z > 1)) {
                     continue;
                 }
 
                 if (depth == null || this.depthTest.test(depth.get(x, y), z)) {
+                    alpha *= vec0.w;
+                    beta *= vec1.w;
+                    gamma *= vec2.w;
+                    var invW = 1 / (alpha + beta + gamma);
+
                     var u = (alpha * uv0.x + beta * uv1.x + gamma * uv2.x) * invW;
                     var v = (alpha * uv0.y + beta * uv1.y + gamma * uv2.y) * invW;
 
