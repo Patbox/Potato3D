@@ -8,6 +8,7 @@ import com.mojang.blaze3d.shaders.ShaderSource;
 import com.mojang.blaze3d.systems.CommandEncoderBackend;
 import com.mojang.blaze3d.systems.GpuDeviceBackend;
 import com.mojang.blaze3d.textures.*;
+import eu.pb4.softwaregl.SoftwareGL;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
@@ -75,7 +76,7 @@ public class SoftDevice implements GpuDeviceBackend {
 
     @Override
     public String getImplementationInformation() {
-        return "SoftwareGL";
+        return "SoftwareGL by Patbox";
     }
 
     @Override
@@ -90,22 +91,22 @@ public class SoftDevice implements GpuDeviceBackend {
 
     @Override
     public String getVendor() {
-        return "Taterion";
+        return "Tiny Potato";
     }
 
     @Override
     public String getBackendName() {
-        return "SoftwareGL";
+        return SoftwareGL.MOD_NAME;
     }
 
     @Override
     public String getVersion() {
-        return "0";
+        return SoftwareGL.MOD_VERSION;
     }
 
     @Override
     public String getRenderer() {
-        return "Potato";
+        return "Software Renderer";
     }
 
     @Override

@@ -6,6 +6,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Vector4f;
 
 public class RGBA {
+    private static final float[] FLOAT_LOOKUP = new float[256];
     public static int alpha(final int color) {
         return color & 255;
     }
@@ -108,18 +109,30 @@ public class RGBA {
     }
 
     private static float from8BitChannel(final int value) {
-        return (float)value / 255.0F;
+        return value / 255.0F;
     }
 
     public static int colorFromFloatRGBA(float red, float green, float blue, float alpha) {
-        return colorARGB(as8BitChannel(alpha), as8BitChannel(red), as8BitChannel(green), as8BitChannel(blue));
+        return ((int) (red * 0xFF) & 0xFF) << 24
+                | ((int) (green * 0xFF) & 0xFF) << 16
+                | ((int) (blue * 0xFF) & 0xFF) << 8
+                | ((int) (alpha * 0xFF) & 0xFF);
     }
 
     public static int fromVector4f(Vector4f color) {
-        return colorFromFloatRGBA(color.x, color.y, color.z, color.w);
+        return ((int) (color.x * 0xFF) & 0xFF) << 24
+                | ((int) (color.y * 0xFF) & 0xFF) << 16
+                | ((int) (color.z * 0xFF) & 0xFF) << 8
+                | ((int) (color.w * 0xFF) & 0xFF);
     }
 
     public static Vector4f toVector4f(int color, Vector4f out) {
-        return out.set(redFloat(color), greenFloat(color), blueFloat(color), alphaFloat(color));
+        return out.set(FLOAT_LOOKUP[(color >> 24) & 0xFF], FLOAT_LOOKUP[(color >> 16) & 0xFF], FLOAT_LOOKUP[(color >> 8) & 0xFF], FLOAT_LOOKUP[color & 0xFF]);
+    }
+
+    static {
+        for (int i = 0; i < 256; i++) {
+            FLOAT_LOOKUP[i] = i / 255f;
+        }
     }
 }
