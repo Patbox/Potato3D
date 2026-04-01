@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "package": "eu.pb4.potato3d.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixinextras": {
+    "minVersion": "0.5.0"
+  },
+  "mixins": [
+    "WindowMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  },
+  "client": [
+    "MinecraftMixin",
+    "MouseHandlerMixin",
+    "OptionsMixin",
+    "SplashManagerMixin",
+    "VideoSettingsScreenMixin"
+  ]
+}
