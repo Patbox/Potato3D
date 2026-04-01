@@ -17,6 +17,8 @@
   "client": [
     "MinecraftMixin",
     "MouseHandlerMixin",
-    "SplashManagerMixin"
+    "OptionsMixin",
+    "SplashManagerMixin",
+    "VideoSettingsScreenMixin"
   ]
 }

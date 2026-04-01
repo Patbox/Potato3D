@@ -29,7 +29,7 @@ public class SoftwareGL implements ModInitializer {
         SoftwareGL.framebufferWidth = framebufferWidth;
         SoftwareGL.framebufferHeight = framebufferHeight;
 
-        return new Vector2i(320, 220);
+        return new Vector2i(Math.min(320, framebufferWidth), Math.min(240, framebufferHeight));
     }
 
     public static double remapMouseY(Window window, double x) {
