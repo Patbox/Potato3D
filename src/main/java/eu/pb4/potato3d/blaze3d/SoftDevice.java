@@ -156,6 +156,6 @@ public class SoftDevice implements GpuDeviceBackend {
 
     @Override
     public boolean isZZeroToOne() {
-        return false;
+        return SoftRenderPass.USE_ZERO_TO_ONE_Z;
     }
 }

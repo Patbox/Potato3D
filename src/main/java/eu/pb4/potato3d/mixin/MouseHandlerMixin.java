@@ -12,13 +12,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MouseHandlerMixin {
     @Inject(method = "getScaledXPos(Lcom/mojang/blaze3d/platform/Window;D)D", at = @At("HEAD"), cancellable = true)
     private static void replaceScalingX(Window window, double x, CallbackInfoReturnable<Double> cir) {
-        if (window.getWidth() == Potato3D.framebufferWidth) return;
+        if (window.getWidth() == Potato3D.framebufferWidth || !Potato3D.MODIFY_CLIENT_BEHAVIOUR) return;
         cir.setReturnValue(Potato3D.remapMouseX(window, x));
     }
 
     @Inject(method = "getScaledYPos(Lcom/mojang/blaze3d/platform/Window;D)D", at = @At("HEAD"), cancellable = true)
     private static void replaceScalingY(Window window, double x, CallbackInfoReturnable<Double> cir) {
-        if (window.getWidth() == Potato3D.framebufferHeight) return;
+        if (window.getWidth() == Potato3D.framebufferHeight || !Potato3D.MODIFY_CLIENT_BEHAVIOUR) return;
         cir.setReturnValue(Potato3D.remapMouseY(window, x));
     }
 }

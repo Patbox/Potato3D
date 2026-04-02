@@ -12,6 +12,7 @@ public class Potato3D implements ModInitializer {
     public static final String MOD_ID = "potato3d";
     public static final String MOD_VERSION;
     public static final String MOD_NAME;
+    public static final boolean MODIFY_CLIENT_BEHAVIOUR = true;
 
     public static final Logger LOGGER = LogUtils.getLogger();
     public static int framebufferWidth;
@@ -29,7 +30,10 @@ public class Potato3D implements ModInitializer {
         Potato3D.framebufferWidth = framebufferWidth;
         Potato3D.framebufferHeight = framebufferHeight;
 
+        if (!MODIFY_CLIENT_BEHAVIOUR) return new Vector2i(framebufferWidth, framebufferHeight);
+
         return new Vector2i(Math.min(320, framebufferWidth), Math.min(240, framebufferHeight));
+        //return new Vector2i(Math.min(280, framebufferWidth), Math.min(210, framebufferHeight));
     }
 
     public static double remapMouseY(Window window, double x) {

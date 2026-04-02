@@ -6,7 +6,7 @@
     "minVersion": "0.5.0"
   },
   "mixins": [
-    "WindowMixin"
+    "options.WindowMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -17,8 +17,8 @@
   "client": [
     "MinecraftMixin",
     "MouseHandlerMixin",
-    "OptionsMixin",
+    "options.OptionsMixin",
     "SplashManagerMixin",
-    "VideoSettingsScreenMixin"
+    "options.VideoSettingsScreenMixin"
   ]
 }

@@ -70,11 +70,15 @@ public class SoftTexture extends GpuTexture {
 
     public void clear(int clearColor) {
         for (int i = 0; i < this.getMipLevels(); i++) {
-            Arrays.fill(this.rgba[i].data(), clearColor);
+            clear(i, clearColor);
         }
     }
 
     public void clear(int mip, int clearColor) {
+        if ("Main / Color".equals(this.getLabel())) {
+            clearColor = clearColor | 0xFF;
+        }
+
         Arrays.fill(this.rgba[mip].data(), clearColor);
     }
 

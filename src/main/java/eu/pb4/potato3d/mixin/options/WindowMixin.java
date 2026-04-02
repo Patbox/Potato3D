@@ -1,4 +1,4 @@
-package eu.pb4.potato3d.mixin;
+package eu.pb4.potato3d.mixin.options;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;

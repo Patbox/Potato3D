@@ -34,6 +34,9 @@ import java.util.function.Supplier;
 import java.util.function.ToIntBiFunction;
 
 public class SoftRenderPass implements RenderPassBackend {
+    public static final boolean USE_ZERO_TO_ONE_Z = true;
+    private static final float CLIP_Z_MIN = USE_ZERO_TO_ONE_Z ? 0 : -1;
+
     private final SoftCommandEncoder encoder;
     private final SoftTextureView colorTexture;
     private final @Nullable SoftTextureView depthTexture;
@@ -49,7 +52,8 @@ public class SoftRenderPass implements RenderPassBackend {
     private ColorBlender blender;
     private boolean writeDepth;
     private boolean limitDepth;
-    private float depthBias;
+    private float depthBiasConstant;
+    private float depthBiasScaleFactor;
     private int vertexLength;
     private int positionOffset;
     private int colorOffset;
@@ -57,7 +61,7 @@ public class SoftRenderPass implements RenderPassBackend {
     private int uv1Offset;
     private int uv2Offset;
     private int normalOffset;
-    private int lineWidth;
+    private int lineWidthOffset;
     private boolean isGlint;
     private DrawCall drawCall = this::executeDraw;
 
@@ -190,7 +194,7 @@ public class SoftRenderPass implements RenderPassBackend {
         this.uv1Offset = vertexFormat.getOffset(VertexFormatElement.UV1);
         this.uv2Offset = vertexFormat.getOffset(VertexFormatElement.UV2);
         this.normalOffset = vertexFormat.getOffset(VertexFormatElement.NORMAL);
-        this.lineWidth = vertexFormat.getOffset(VertexFormatElement.LINE_WIDTH);
+        this.lineWidthOffset = vertexFormat.getOffset(VertexFormatElement.LINE_WIDTH);
 
         this.isGlint = this.pipeline.getColorTargetState().blendFunction().isPresent() && this.pipeline.getColorTargetState().blendFunction().get() == BlendFunction.GLINT;
 
@@ -198,7 +202,9 @@ public class SoftRenderPass implements RenderPassBackend {
         var depthStencilState = pipeline.getDepthStencilState();
         this.writeDepth = depthStencilState != null && depthStencilState.writeDepth();
         this.limitDepth = depthStencilState != null && depthStencilState.depthTest() != CompareOp.ALWAYS_PASS;
-        this.depthBias = depthStencilState != null ? depthStencilState.depthBiasScaleFactor() * Mth.EPSILON * 10 : 0;
+        //this.depthBiasConstant = depthStencilState != null ? depthStencilState.depthBiasConstant() * 1.0E-20F : 0;
+        //this.depthBiasScaleFactor = depthStencilState != null ? depthStencilState.depthBiasScaleFactor() : 0;
+        this.depthBiasConstant = depthStencilState != null ? depthStencilState.depthBiasScaleFactor() * Mth.EPSILON * 10 : 0;
         this.depthTest = depthStencilState != null ? switch (depthStencilState.depthTest()) {
             case ALWAYS_PASS -> (image, drawn) -> true;
             case EQUAL -> (image, drawn) -> image == drawn;
@@ -506,7 +512,7 @@ public class SoftRenderPass implements RenderPassBackend {
         };
 
         var lineWidth = new float[9];
-        Arrays.fill(lineWidth, 0.5f);
+        Arrays.fill(lineWidth, 1f);
 
         Scissor scissor;
         if (this.scissor != null) {
@@ -579,7 +585,7 @@ public class SoftRenderPass implements RenderPassBackend {
                     convertIntoScreenSpace(vec[t + 1], halfWidth, halfHeight);
                     convertIntoScreenSpace(vec[t + 2], halfWidth, halfHeight);
 
-                    if (vec[t].z < -1 && vec[t + 1].z < -1 && vec[t + 2].z < -1) {
+                    if (vec[t].z < CLIP_Z_MIN && vec[t + 1].z < CLIP_Z_MIN && vec[t + 2].z < CLIP_Z_MIN) {
                         continue;
                     }
 
@@ -631,7 +637,7 @@ public class SoftRenderPass implements RenderPassBackend {
                     convertIntoScreenSpace(vec[t + 1], halfWidth, halfHeight);
                     convertIntoScreenSpace(vec[t + 2], halfWidth, halfHeight);
 
-                    if (vec[t].z < -1 && vec[t + 1].z < -1 && vec[t + 2].z < -1) {
+                    if (vec[t].z < CLIP_Z_MIN && vec[t + 1].z < CLIP_Z_MIN && vec[t + 2].z < CLIP_Z_MIN) {
                         continue;
                     }
 
@@ -670,7 +676,7 @@ public class SoftRenderPass implements RenderPassBackend {
                     convertIntoScreenSpace(vec[t], halfWidth, halfHeight);
                     convertIntoScreenSpace(vec[t + 1], halfWidth, halfHeight);
 
-                    if (vec[t].z < -1 && vec[t + 1].z < -1) {
+                    if (vec[t].z < CLIP_Z_MIN && vec[t + 1].z < CLIP_Z_MIN) {
                         continue;
                     }
 
@@ -777,6 +783,10 @@ public class SoftRenderPass implements RenderPassBackend {
 
             var color = sampler2.sample(0, 0, u, v, 0, 0);
             colors[a].mul(RGBA.redFloat(color), RGBA.greenFloat(color), RGBA.blueFloat(color), RGBA.alphaFloat(color));
+        }
+
+        if (this.lineWidthOffset != -1) {
+            lineWidth[a] = vertexBuffer.getFloat(pos + this.lineWidthOffset);
         }
     }
 
@@ -888,7 +898,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var color2 = colors[offset + 2];
 
         var totalArea = signedTriangleArea(vec0.x, vec0.y, vec1.x, vec1.y, vec2.x, vec2.y);
-        if (totalArea < 0.25f && (this.pipeline.isCull() || totalArea > -0.25f)) return;
+        if (totalArea < 0.05f && (this.pipeline.isCull() || totalArea > -0.05f)) return;
         var side = Mth.sign(totalArea);
 
         totalArea = 1 / totalArea;
@@ -897,22 +907,26 @@ public class SoftRenderPass implements RenderPassBackend {
             int yOffset = color.width() * y;
             for (int x = minX; x <= maxX; x++) {
 
-                var alpha = signedTriangleArea(x +0.75f, y +0.75f, vec1.x, vec1.y, vec2.x, vec2.y);
+                var alpha = signedTriangleArea(x +0.4995f, y +0.4995f, vec1.x, vec1.y, vec2.x, vec2.y);
                 if (alpha * side < 0) continue;
 
-                var beta = signedTriangleArea(x +0.75f, y +0.75f, vec2.x, vec2.y, vec0.x, vec0.y);
+                var beta = signedTriangleArea(x +0.4995f, y +0.4995f, vec2.x, vec2.y, vec0.x, vec0.y);
                 if (beta * side < 0) continue;
 
-                var gamma = signedTriangleArea(x +0.75f, y +0.75f, vec0.x, vec0.y, vec1.x, vec1.y);
+                var gamma = signedTriangleArea(x +0.4995f, y +0.4995f, vec0.x, vec0.y, vec1.x, vec1.y);
                 if (gamma * side < 0) continue;
 
                 alpha *= totalArea;
                 beta *= totalArea;
                 gamma *= totalArea;
 
-                var z = Math.fma(alpha, vec0.z, Math.fma(beta, vec1.z, gamma * vec2.z)) + this.depthBias;
+                var z = Math.fma(alpha, vec0.z, Math.fma(beta, vec1.z, gamma * vec2.z));
 
-                if (this.limitDepth && (z < -1 || z > 1)) {
+                if (depth != null) {
+                    z = this.applyDepthBias(z, depth.data()[x + yOffset]);
+                }
+
+                if (this.limitDepth && (z < CLIP_Z_MIN || z > 1)) {
                     continue;
                 }
 
@@ -954,6 +968,10 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
+    private float applyDepthBias(float z, float sourceZ) {
+        return z + (z - sourceZ) * this.depthBiasScaleFactor + this.depthBiasConstant;
+    }
+
     private void drawLine(RGBATexture color, @Nullable DepthTexture depth, Scissor scissor,
                           int offset, Vector4f[] vec, Vector2f[] uvs, Vector4f[] colors,
                           float[] lineWidth, @Nullable SoftShader texture, int layer) {
@@ -969,10 +987,15 @@ public class SoftRenderPass implements RenderPassBackend {
             return;
         }
 
-        minX = Math.max(minX, scissor.x1);
-        maxX = Math.min(maxX, scissor.x2 - 1);
-        minY = Math.max(minY, scissor.y1);
-        maxY = Math.min(maxY, scissor.y2 - 1);
+        var lineWidth0 = lineWidth[offset] * 0.5f;
+        var lineWidth1 = lineWidth[offset + 1];
+
+        var boundaryMargin = (int) Math.max(lineWidth0, lineWidth1);
+
+        minX = Math.max(minX - boundaryMargin, scissor.x1);
+        maxX = Math.min(maxX + boundaryMargin, scissor.x2 - 1);
+        minY = Math.max(minY - boundaryMargin, scissor.y1);
+        maxY = Math.min(maxY + boundaryMargin, scissor.y2 - 1);
 
         var drawnColor = new Vector4f();
         var originalColor = new Vector4f();
@@ -984,9 +1007,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var color1 = colors[offset + 1];
 
         var length = vec0.distance(vec1.x, vec1.y, vec0.z, vec0.w);
-
-        var lineWidth0 = lineWidth[offset];
-        var lineWidth1 = lineWidth[offset + 1];
+        var lengthWidth = Mth.square(length + lineWidth0);
 
         for (int y = minY; y <= maxY; y++) {
             int yOffset = color.width() * y;
@@ -995,13 +1016,21 @@ public class SoftRenderPass implements RenderPassBackend {
 
                 if (r > lineWidth0) continue;
                 var distFrom0 = vec0.distanceSquared(x + 0.5f, y + 0.5f, vec0.z, vec0.w);
+                var distFrom1 = vec1.distanceSquared(x + 0.5f, y + 0.5f, vec1.z, vec1.w);
+
+                if (distFrom0 > lengthWidth || distFrom1 > lengthWidth) continue;
+
                 var dist = Mth.sqrt(distFrom0 - r * r);
 
                 var delta = Mth.clamp(dist / length, 0, 1);
 
-                var z = Mth.lerp(delta, vec0.z, vec1.z) + this.depthBias - Mth.EPSILON * 10;
+                var z = Mth.lerp(delta, vec0.z, vec1.z);
 
-                if (this.limitDepth && (z < -1 || z > 1)) {
+                if (depth != null) {
+                    z = this.applyDepthBias(z, depth.data()[x + yOffset]);
+                }
+
+                if (this.limitDepth && (z < CLIP_Z_MIN || z > 1)) {
                     continue;
                 }
 
