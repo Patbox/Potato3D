@@ -5,6 +5,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.CompareOp;
+import com.mojang.blaze3d.systems.GpuQueryPool;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderPassBackend;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -208,6 +209,11 @@ public class SoftRenderPass implements RenderPassBackend {
             System.currentTimeMillis();
             // Pain
         }
+    }
+
+    @Override
+    public void writeTimestamp(GpuQueryPool pool, int index) {
+
     }
 
     @Override
@@ -1081,16 +1087,6 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
-    @Override
-    public void close() {
-        this.closed = true;
-        this.encoder.isInRenderPass = false;
-    }
-
-    @Override
-    public boolean isClosed() {
-        return this.closed;
-    }
 
 
     private interface DepthTestPredicate {

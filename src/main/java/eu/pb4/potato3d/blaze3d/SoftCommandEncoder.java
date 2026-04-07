@@ -6,6 +6,7 @@ import com.mojang.blaze3d.buffers.GpuFence;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.CommandEncoderBackend;
 import com.mojang.blaze3d.systems.GpuQuery;
+import com.mojang.blaze3d.systems.GpuQueryPool;
 import com.mojang.blaze3d.systems.RenderPassBackend;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
@@ -23,6 +24,11 @@ import java.util.function.Supplier;
 
 public class SoftCommandEncoder implements CommandEncoderBackend {
     public boolean isInRenderPass = false;
+
+    @Override
+    public void submit() {
+
+    }
 
     @Override
     public RenderPassBackend createRenderPass(Supplier<String> label, GpuTextureView colorTexture, OptionalInt clearColor) {
@@ -44,8 +50,8 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     }
 
     @Override
-    public boolean isInRenderPass() {
-        return this.isInRenderPass;
+    public void submitRenderPass() {
+
     }
 
     @Override
@@ -174,26 +180,26 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         var src = ((SoftTexture) source).rgba[mipLevel].data();
         var dest = ((SoftBuffer) destination).data();
 
-        switch (source.getFormat()) {
-            case RGBA8 -> {
+        switch (source.getFormat().name().split("_")[0]) {
+            case "RGB8" -> {
                 for (int i = 0; i < src.length; i++) {
                     dest.putInt((int) (offset + i * 4), Integer.reverseBytes(src[i]));
                 }
             }
-            case RED8 -> {
+            case "R8" -> {
                 for (int i = 0; i < src.length; i++) {
                     var color = src[i];
                     dest.put((int) (offset + i), (byte) ARGB.red(color));
                 }
             }
-            case RED8I -> {
+            case "RG8" -> {
                 for (int i = 0; i < src.length; i++) {
                     var color = src[i];
                     dest.put((int) (offset + i * 2), (byte) ARGB.red(color));
                     dest.put((int) (offset + i * 2 + 1), (byte) ARGB.alpha(color));
                 }
             }
-            case DEPTH32 -> {
+            case "D32" -> {
                 var srcd = ((SoftTexture) source).depth[mipLevel].data();
 
                 for (int i = 0; i < src.length; i++) {
@@ -223,7 +229,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         }
     }
 
-    @Override
+    //@Override
     public void presentTexture(GpuTextureView texture) {
         // Only OpenGl needed
         // Ideally I would kill it, but that might require swapping used window library
@@ -292,22 +298,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     }
 
     @Override
-    public GpuQuery timerQueryBegin() {
-        return new GpuQuery() {
-            @Override
-            public OptionalLong getValue() {
-                return OptionalLong.empty();
-            }
-
-            @Override
-            public void close() {
-
-            }
-        };
-    }
-
-    @Override
-    public void timerQueryEnd(GpuQuery query) {
+    public void writeTimestamp(GpuQueryPool pool, int index) {
 
     }
 }

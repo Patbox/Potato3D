@@ -13,10 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
 
-    @Definition(id = "GpuBackend", type = GpuBackend.class)
-    @Definition(id = "GlBackend", type = GlBackend.class)
-    @Expression("new GpuBackend[]{ new GlBackend() }")
-    @ModifyExpressionValue(method = "<init>", at = @At("MIXINEXTRAS:EXPRESSION"))
+    @ModifyExpressionValue(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/PreferredGraphicsApi;getBackendsToTry()[Lcom/mojang/blaze3d/systems/GpuBackend;"))
     private GpuBackend[] t(GpuBackend[] original){
         return new GpuBackend[] { new SoftBackend() };
     }

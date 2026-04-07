@@ -27,6 +27,7 @@ public class VideoSettingsScreenMixin {
         if (!Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
 
         var list = new ArrayList<>(List.of(original));
+        list.remove(options.preferredGraphicsBackend());
         return list.toArray(OptionInstance[]::new);
     }
 

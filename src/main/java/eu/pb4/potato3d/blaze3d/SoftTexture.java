@@ -1,7 +1,7 @@
 package eu.pb4.potato3d.blaze3d;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
 import eu.pb4.potato3d.blaze3d.texture.DepthTexture;
 import eu.pb4.potato3d.blaze3d.texture.RGBATexture;
 import eu.pb4.potato3d.blaze3d.texture.TextureLike;
@@ -13,12 +13,12 @@ public class SoftTexture extends GpuTexture {
     public final RGBATexture[] rgba;
     public final DepthTexture[] depth;
 
-    public SoftTexture(@Usage int usage, String label, TextureFormat format, int width, int height, int depthOrLayers, int mipLevels) {
+    public SoftTexture(@Usage int usage, String label, GpuFormat format, int width, int height, int depthOrLayers, int mipLevels) {
         super(usage, label, format, width, height, depthOrLayers, mipLevels);
         var layerHeight = height * depthOrLayers;
 
         this.texture = new TextureLike[mipLevels];
-        if (format == TextureFormat.DEPTH32) {
+        if (format.name().startsWith("D")) {
             this.depth = new DepthTexture[mipLevels];
             this.rgba = new RGBATexture[0];
             for (int i = 0; i < mipLevels; i++) {
