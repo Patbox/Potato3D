@@ -24,7 +24,7 @@ public class VideoSettingsScreenMixin {
 
     @ModifyReturnValue(method = "displayOptions", at = @At("RETURN"))
     private static OptionInstance<?>[] hideBrokenDisplayOptions(OptionInstance<?>[] original, @Local(argsOnly = true) Options options) {
-        if (Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
+        if (!Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
 
         var list = new ArrayList<>(List.of(original));
         return list.toArray(OptionInstance[]::new);
@@ -32,7 +32,7 @@ public class VideoSettingsScreenMixin {
 
     @ModifyReturnValue(method = "qualityOptions", at = @At("RETURN"))
     private static OptionInstance<?>[] hideBrokenQualityOptions(OptionInstance<?>[] original, @Local(argsOnly = true) Options options) {
-        if (Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
+        if (!Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
 
         var list = new ArrayList<>(List.of(original));
         list.remove(options.mipmapLevels());
@@ -46,7 +46,7 @@ public class VideoSettingsScreenMixin {
 
     @ModifyReturnValue(method = "preferenceOptions", at = @At("RETURN"))
     private static OptionInstance<?>[] hideBrokenPreferenceOptions(OptionInstance<?>[] original, @Local(argsOnly = true) Options options) {
-        if (Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
+        if (!Potato3D.MODIFY_CLIENT_BEHAVIOUR) return original;
 
         var list = new ArrayList<>(List.of(original));
         list.remove(options.vignette());
