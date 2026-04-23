@@ -87,7 +87,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         var src = (SoftBuffer) source.buffer();
         var dest = (SoftBuffer) target.buffer();
 
-        src.data().put((int) source.offset(), dest.data(), (int) target.offset(), (int) target.length());
+        dest.data().put((int) target.offset(), src.data(), (int) source.offset(), (int) source.length());
     }
 
     @Override
@@ -286,7 +286,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
 
             @Override
             public boolean awaitCompletion(long timeoutMs) {
-                return false;
+                return true;
             }
         };
     }
