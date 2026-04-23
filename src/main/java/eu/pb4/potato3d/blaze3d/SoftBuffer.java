@@ -6,7 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 public class SoftBuffer extends GpuBuffer implements GpuBuffer.MappedView {
-    private final ByteBuffer buffer;
+    private ByteBuffer buffer;
     private boolean closed = false;
 
     public SoftBuffer(String label, @Usage int usage, long size) {
@@ -33,6 +33,7 @@ public class SoftBuffer extends GpuBuffer implements GpuBuffer.MappedView {
     @Override
     public void close() {
         this.buffer.clear();
+        this.buffer = null;
         this.closed = true;
     }
 

@@ -22,7 +22,9 @@ public class SoftDevice implements GpuDeviceBackend {
     private static final DeviceInfo DEVICE_INFO = new DeviceInfo("Software Renderer", "Tiny Potato",
             Potato3D.MOD_VERSION,
             SoftRenderPass.USE_ZERO_TO_ONE_Z, Potato3D.MOD_NAME, 0.1f,
-            new DeviceLimits(1, 1, Short.MAX_VALUE), Set.of()
+            new DeviceLimits(1, 1, Short.MAX_VALUE), Set.of(),
+            new HintsAndWorkarounds(false, false),
+            DeviceType.CPU
     );
     private final long window;
     private final ShaderSource shaderSource;

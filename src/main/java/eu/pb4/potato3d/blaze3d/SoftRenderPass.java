@@ -2,6 +2,7 @@ package eu.pb4.potato3d.blaze3d;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.CompareOp;
@@ -29,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.function.ToIntBiFunction;
@@ -49,6 +51,7 @@ public class SoftRenderPass implements RenderPassBackend {
     private final Vector4f[] colors;
     private final Vector3f[] normals;
     private final float[] lineWidth;
+    private final Scissor defaultScissor;
 
     private boolean closed;
     private RenderPipeline pipeline;
@@ -71,11 +74,13 @@ public class SoftRenderPass implements RenderPassBackend {
     private int lineWidthOffset;
     private boolean isGlint;
     private DrawCall drawCall = this::executeDraw;
+    private List<String> boundSamplers = List.of();
 
-    public SoftRenderPass(SoftCommandEncoder encoder, String label, SoftTextureView colorTexture, @Nullable SoftTextureView depthTexture) {
+    public SoftRenderPass(SoftCommandEncoder encoder, String label, SoftTextureView colorTexture, @Nullable SoftTextureView depthTexture, RenderPass.RenderArea renderArea) {
         this.encoder = encoder;
         this.colorTexture = colorTexture;
-        this.scissor = null;
+        this.defaultScissor = new Scissor(renderArea.x(), renderArea.y(), renderArea.x()  +renderArea.width(), renderArea.y() + renderArea.height());
+        this.scissor = this.defaultScissor;
         this.depthTexture = depthTexture;
 
         this.pos = new Vector4f[]{
@@ -160,7 +165,7 @@ public class SoftRenderPass implements RenderPassBackend {
 
     @Override
     public void disableScissor() {
-        this.scissor = null;
+        this.scissor = this.defaultScissor;
     }
 
     @Override
@@ -219,6 +224,7 @@ public class SoftRenderPass implements RenderPassBackend {
     @Override
     public void setPipeline(RenderPipeline pipeline) {
         this.pipeline = pipeline;
+        this.boundSamplers = BindGroupLayout.flattenSamplers(this.pipeline.getBindGroupLayouts());
 
         var vertexFormat = this.pipeline.getVertexFormat();
 
@@ -454,9 +460,10 @@ public class SoftRenderPass implements RenderPassBackend {
         var cameraOffset = new Vector3f();
 
         var position = new Vector3f();
-        SoftShader sampler0 = this.pipeline.getSamplers().contains("Sampler0") ? this.binds.get("Sampler0") : null;
-        SampledTexture sampler1 = this.pipeline.getSamplers().contains("Sampler1") ? this.binds.get("Sampler1") : null;
-        SampledTexture sampler2 = this.pipeline.getSamplers().contains("Sampler2") ? this.binds.get("Sampler2") : null;
+
+        SoftShader sampler0 = this.boundSamplers.contains("Sampler0") ? this.binds.get("Sampler0") : null;
+        SampledTexture sampler1 = this.boundSamplers.contains("Sampler1") ? this.binds.get("Sampler1") : null;
+        SampledTexture sampler2 = this.boundSamplers.contains("Sampler2") ? this.binds.get("Sampler2") : null;
 
         var glintAlpha = 1f;
         var gameTime = 1f;

@@ -4,10 +4,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.GpuFence;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.CommandEncoderBackend;
-import com.mojang.blaze3d.systems.GpuQuery;
-import com.mojang.blaze3d.systems.GpuQueryPool;
-import com.mojang.blaze3d.systems.RenderPassBackend;
+import com.mojang.blaze3d.systems.*;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import eu.pb4.potato3d.RGBA;
@@ -31,12 +28,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     }
 
     @Override
-    public RenderPassBackend createRenderPass(Supplier<String> label, GpuTextureView colorTexture, OptionalInt clearColor) {
-        return createRenderPass(label, colorTexture, clearColor, null, OptionalDouble.empty());
-    }
-
-    @Override
-    public RenderPassBackend createRenderPass(Supplier<String> label, GpuTextureView colorTexture, OptionalInt clearColor, @Nullable GpuTextureView depthTexture, OptionalDouble clearDepth) {
+    public RenderPassBackend createRenderPass(Supplier<String> label, GpuTextureView colorTexture, OptionalInt clearColor, @Nullable GpuTextureView depthTexture, OptionalDouble clearDepth, RenderPass.RenderArea renderArea) {
         if (clearColor.isPresent()) {
             ((SoftTexture) colorTexture.texture()).clear(colorTexture.baseMipLevel(), RGBA.colorARGB(clearColor.getAsInt()));
         }
@@ -46,7 +38,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         }
 
 
-        return new SoftRenderPass(this, label != null ? label.get() : null, (SoftTextureView) colorTexture, (SoftTextureView) depthTexture);
+        return new SoftRenderPass(this, label != null ? label.get() : null, (SoftTextureView) colorTexture, (SoftTextureView) depthTexture, renderArea);
     }
 
     @Override
@@ -93,7 +85,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         var src = (SoftBuffer) source.buffer();
         var dest = (SoftBuffer) target.buffer();
 
-        src.data().put((int) source.offset(), dest.data(), (int) target.offset(), (int) target.length());
+        dest.data().put((int) target.offset(), src.data(), (int) source.offset(), (int) source.length());
     }
 
     @Override
@@ -292,7 +284,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
 
             @Override
             public boolean awaitCompletion(long timeoutMs) {
-                return false;
+                return true;
             }
         };
     }
