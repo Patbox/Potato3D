@@ -4,20 +4,19 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.GpuFence;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.*;
+import com.mojang.blaze3d.systems.CommandEncoderBackend;
+import com.mojang.blaze3d.systems.GpuQueryPool;
+import com.mojang.blaze3d.systems.RenderPassBackend;
+import com.mojang.blaze3d.systems.RenderPassDescriptor;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import eu.pb4.potato3d.RGBA;
 import eu.pb4.potato3d.Potato3D;
+import eu.pb4.potato3d.RGBA;
 import net.minecraft.util.ARGB;
-import org.jspecify.annotations.Nullable;
+import org.joml.Vector4fc;
 import org.lwjgl.opengl.GL11;
 
 import java.nio.ByteBuffer;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
-import java.util.function.Supplier;
 
 public class SoftCommandEncoder implements CommandEncoderBackend {
     public boolean isInRenderPass = false;
@@ -28,17 +27,27 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     }
 
     @Override
-    public RenderPassBackend createRenderPass(Supplier<String> label, GpuTextureView colorTexture, OptionalInt clearColor, @Nullable GpuTextureView depthTexture, OptionalDouble clearDepth, RenderPass.RenderArea renderArea) {
-        if (clearColor.isPresent()) {
-            ((SoftTexture) colorTexture.texture()).clear(colorTexture.baseMipLevel(), RGBA.colorARGB(clearColor.getAsInt()));
+    public RenderPassBackend createRenderPass(RenderPassDescriptor descriptor) {
+        SoftTextureView colorTexture = null;
+        SoftTextureView depthTexture = null;
+
+        for (var color : descriptor.colorAttachments) {
+            if (color.clearValue().isPresent()) {
+                ((SoftTexture) color.textureView().texture()).clear(color.textureView().baseMipLevel(), RGBA.fromVector4f(color.clearValue().get()));
+            }
+            colorTexture = (SoftTextureView) color.textureView();
         }
 
-        if (depthTexture != null && clearDepth.isPresent()) {
-            ((SoftTexture) depthTexture.texture()).clear(depthTexture.baseMipLevel(), clearDepth.getAsDouble());
+        if (descriptor.depthAttachment != null) {
+            if ( descriptor.depthAttachment.clearValue().isPresent()) {
+                ((SoftTexture) descriptor.depthAttachment.textureView().texture()).clear(descriptor.depthAttachment.textureView().baseMipLevel(),
+                        descriptor.depthAttachment.clearValue().getAsDouble());
+            }
+            depthTexture = (SoftTextureView) descriptor.depthAttachment.textureView();
         }
 
 
-        return new SoftRenderPass(this, label != null ? label.get() : null, (SoftTextureView) colorTexture, (SoftTextureView) depthTexture, renderArea);
+        return new SoftRenderPass(this, descriptor.label().get(), colorTexture, depthTexture, descriptor.renderArea);
     }
 
     @Override
@@ -47,19 +56,19 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     }
 
     @Override
-    public void clearColorTexture(GpuTexture colorTexture, int clearColor) {
-        ((SoftTexture) colorTexture).clear(RGBA.colorARGB(clearColor));
+    public void clearColorTexture(GpuTexture colorTexture, Vector4fc clearColor) {
+        ((SoftTexture) colorTexture).clear(RGBA.fromVector4f(clearColor));
     }
 
     @Override
-    public void clearColorAndDepthTextures(GpuTexture colorTexture, int clearColor, GpuTexture depthTexture, double clearDepth) {
-        ((SoftTexture) colorTexture).clear(RGBA.colorARGB(clearColor));
+    public void clearColorAndDepthTextures(GpuTexture colorTexture, Vector4fc clearColor, GpuTexture depthTexture, double clearDepth) {
+        ((SoftTexture) colorTexture).clear(RGBA.fromVector4f(clearColor));
         ((SoftTexture) depthTexture).clear(clearDepth);
     }
 
     @Override
-    public void clearColorAndDepthTextures(GpuTexture colorTexture, int clearColor, GpuTexture depthTexture, double clearDepth, int regionX, int regionY, int regionWidth, int regionHeight) {
-        ((SoftTexture) colorTexture).clear(RGBA.colorARGB(clearColor), regionX, regionY, regionWidth, regionHeight);
+    public void clearColorAndDepthTextures(GpuTexture colorTexture, Vector4fc clearColor, GpuTexture depthTexture, double clearDepth, int regionX, int regionY, int regionWidth, int regionHeight) {
+        ((SoftTexture) colorTexture).clear(RGBA.fromVector4f(clearColor), regionX, regionY, regionWidth, regionHeight);
         ((SoftTexture) depthTexture).clear(clearDepth, regionX, regionY, regionWidth, regionHeight);
     }
 
@@ -71,13 +80,6 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     @Override
     public void writeToBuffer(GpuBufferSlice destination, ByteBuffer data) {
         ((SoftBuffer) destination.buffer()).data().put(Math.toIntExact(destination.offset()), data, 0, data.remaining());
-    }
-
-    @Override
-    public GpuBuffer.MappedView mapBuffer(GpuBufferSlice buffer, boolean read, boolean write) {
-        var buf = ((SoftBuffer) buffer.buffer()).data().slice((int) buffer.offset(), (int) (buffer.length()));
-        buf.order(((SoftBuffer) buffer.buffer()).data().order());
-        return new SoftBuffer.MappedView(buf);
     }
 
     @Override

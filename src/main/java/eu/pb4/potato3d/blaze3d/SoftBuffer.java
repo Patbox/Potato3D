@@ -1,11 +1,13 @@
 package eu.pb4.potato3d.blaze3d;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Map;
 
-public class SoftBuffer extends GpuBuffer implements GpuBuffer.MappedView {
+public class SoftBuffer extends GpuBuffer  {
     private ByteBuffer buffer;
     private boolean closed = false;
 
@@ -25,22 +27,20 @@ public class SoftBuffer extends GpuBuffer implements GpuBuffer.MappedView {
         return this.closed;
     }
 
-    @Override
     public ByteBuffer data() {
         return this.buffer;
     }
 
     @Override
     public void close() {
-        this.buffer.clear();
         this.buffer = null;
         this.closed = true;
     }
 
-    public record MappedView(ByteBuffer data) implements GpuBuffer.MappedView {
-        @Override
-        public void close() {
-            data.position(0);
-        }
+    @Override
+    public GpuBufferSlice.MappedView map(long offset, long length, boolean read, boolean write) {
+        var buf = this.buffer.slice((int) offset, (int) length);
+        buf.order(this.buffer.order());
+        return new GpuBufferSlice.MappedView(new GpuBufferSlice(this, offset, length), buf, () -> {});
     }
 }

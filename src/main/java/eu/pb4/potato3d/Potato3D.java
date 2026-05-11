@@ -32,8 +32,11 @@ public class Potato3D implements ModInitializer {
 
         if (!MODIFY_CLIENT_BEHAVIOUR) return new Vector2i(framebufferWidth, framebufferHeight);
 
+        //return new Vector2i(framebufferWidth, framebufferHeight);
+        //return new Vector2i(Math.min(640, framebufferWidth), Math.min(480, framebufferHeight));
         return new Vector2i(Math.min(320, framebufferWidth), Math.min(240, framebufferHeight));
         //return new Vector2i(Math.min(280, framebufferWidth), Math.min(210, framebufferHeight));
+        //return new Vector2i(Math.min(256, framebufferWidth), Math.min(256, framebufferHeight));
     }
 
     public static double remapMouseY(Window window, double x) {

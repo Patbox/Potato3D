@@ -4,6 +4,7 @@ import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector4f;
+import org.joml.Vector4fc;
 
 public class RGBA {
     private static final float[] FLOAT_LOOKUP = new float[256];
@@ -119,11 +120,11 @@ public class RGBA {
                 | ((int) (alpha * 0xFF) & 0xFF);
     }
 
-    public static int fromVector4f(Vector4f color) {
-        return ((int) (color.x * 0xFF) & 0xFF) << 24
-                | ((int) (color.y * 0xFF) & 0xFF) << 16
-                | ((int) (color.z * 0xFF) & 0xFF) << 8
-                | ((int) (color.w * 0xFF) & 0xFF);
+    public static int fromVector4f(Vector4fc color) {
+        return ((int) (color.x() * 0xFF) & 0xFF) << 24
+                | ((int) (color.y() * 0xFF) & 0xFF) << 16
+                | ((int) (color.z() * 0xFF) & 0xFF) << 8
+                | ((int) (color.w() * 0xFF) & 0xFF);
     }
 
     public static Vector4f toVector4f(int color, Vector4f out) {

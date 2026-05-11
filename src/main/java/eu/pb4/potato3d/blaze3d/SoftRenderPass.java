@@ -1,5 +1,7 @@
 package eu.pb4.potato3d.blaze3d;
 
+import com.mojang.blaze3d.IndexType;
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.BindGroupLayout;
@@ -12,8 +14,8 @@ import com.mojang.blaze3d.systems.RenderPassBackend;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormatElement;
 import eu.pb4.potato3d.RGBA;
 import eu.pb4.potato3d.blaze3d.shader.EndShader;
 import eu.pb4.potato3d.blaze3d.shader.SampledTexture;
@@ -56,7 +58,7 @@ public class SoftRenderPass implements RenderPassBackend {
     private boolean closed;
     private RenderPipeline pipeline;
     private ByteBuffer indexBuffer;
-    private VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
+    private IndexType indexType = IndexType.INT;
     private Scissor scissor;
     private DepthTestPredicate depthTest;
     private ColorBlender blender;
@@ -73,13 +75,13 @@ public class SoftRenderPass implements RenderPassBackend {
     private int normalOffset;
     private int lineWidthOffset;
     private boolean isGlint;
-    private DrawCall drawCall = this::executeDraw;
     private List<String> boundSamplers = List.of();
+    private DrawCall drawCall = this::executeDraw;
 
     public SoftRenderPass(SoftCommandEncoder encoder, String label, SoftTextureView colorTexture, @Nullable SoftTextureView depthTexture, RenderPass.RenderArea renderArea) {
         this.encoder = encoder;
         this.colorTexture = colorTexture;
-        this.defaultScissor = new Scissor(renderArea.x(), renderArea.y(), renderArea.x()  +renderArea.width(), renderArea.y() + renderArea.height());
+        this.defaultScissor = renderArea != null ? new Scissor(renderArea.x(), renderArea.y(), renderArea.x() + renderArea.width(), renderArea.y() + renderArea.height()) : new Scissor(0, 0, colorTexture.getWidth(0), colorTexture.getHeight(0));
         this.scissor = this.defaultScissor;
         this.depthTexture = depthTexture;
 
@@ -169,12 +171,12 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
-    public void setVertexBuffer(int slot, GpuBuffer vertexBuffer) {
-        this.vertexBuffers[slot] = ((SoftBuffer) vertexBuffer).data();
+    public void setVertexBuffer(int slot, @Nullable GpuBufferSlice vertexBuffer) {
+        this.vertexBuffers[slot] = vertexBuffer.map(true, false).data();
     }
 
     @Override
-    public void setIndexBuffer(GpuBuffer indexBuffer, VertexFormat.IndexType indexType) {
+    public void setIndexBuffer(GpuBuffer indexBuffer, IndexType indexType) {
         this.indexBuffer = ((SoftBuffer) indexBuffer).data();
         this.indexType = indexType;
     }
@@ -190,7 +192,7 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
-    public <T> void drawMultipleIndexed(Collection<RenderPass.Draw<T>> draws, @Nullable GpuBuffer defaultIndexBuffer, VertexFormat.@Nullable IndexType defaultIndexType, Collection<String> dynamicUniforms, T uniformArgument) {
+    public <T> void drawMultipleIndexed(Collection<RenderPass.Draw<T>> draws, @Nullable GpuBuffer defaultIndexBuffer, @Nullable IndexType defaultIndexType, Collection<String> dynamicUniforms, T uniformArgument) {
         try {
             for (var draw : draws) {
                 var indexBuf = draw.indexBuffer() != null ? draw.indexBuffer() : defaultIndexBuffer;
@@ -226,19 +228,19 @@ public class SoftRenderPass implements RenderPassBackend {
         this.pipeline = pipeline;
         this.boundSamplers = BindGroupLayout.flattenSamplers(this.pipeline.getBindGroupLayouts());
 
-        var vertexFormat = this.pipeline.getVertexFormat();
+        var vertexFormat = this.pipeline.getVertexFormatBinding(0);
+        if (vertexFormat != null) {
+            this.vertexLength = vertexFormat.getVertexSize();
+            this.positionOffset = getElementOffset(vertexFormat, DefaultVertexFormat.POSITION_SEMANTIC_NAME);
+            this.colorOffset = getElementOffset(vertexFormat, DefaultVertexFormat.COLOR_SEMANTIC_NAME);
+            this.uvOffset = getElementOffset(vertexFormat, DefaultVertexFormat.UV0_SEMANTIC_NAME);
+            this.uv1Offset = getElementOffset(vertexFormat, DefaultVertexFormat.UV1_SEMANTIC_NAME);
+            this.uv2Offset = getElementOffset(vertexFormat, DefaultVertexFormat.UV2_SEMANTIC_NAME);
+            this.normalOffset = getElementOffset(vertexFormat, DefaultVertexFormat.NORMAL_SEMANTIC_NAME);
+            this.lineWidthOffset = getElementOffset(vertexFormat, DefaultVertexFormat.LINE_WIDTH_SEMANTIC_NAME);
 
-        this.vertexLength = vertexFormat.getVertexSize();
-        this.positionOffset = vertexFormat.getOffset(VertexFormatElement.POSITION);
-        this.colorOffset = vertexFormat.getOffset(VertexFormatElement.COLOR);
-        this.uvOffset = vertexFormat.getOffset(VertexFormatElement.UV0);
-        this.uv1Offset = vertexFormat.getOffset(VertexFormatElement.UV1);
-        this.uv2Offset = vertexFormat.getOffset(VertexFormatElement.UV2);
-        this.normalOffset = vertexFormat.getOffset(VertexFormatElement.NORMAL);
-        this.lineWidthOffset = vertexFormat.getOffset(VertexFormatElement.LINE_WIDTH);
-
-        this.isGlint = this.pipeline.getColorTargetState().blendFunction().isPresent() && this.pipeline.getColorTargetState().blendFunction().get() == BlendFunction.GLINT;
-
+            this.isGlint = this.pipeline.getColorTargetState().blendFunction().isPresent() && this.pipeline.getColorTargetState().blendFunction().get() == BlendFunction.GLINT;
+        }
 
         var depthStencilState = pipeline.getDepthStencilState();
         this.writeDepth = depthStencilState != null && depthStencilState.writeDepth();
@@ -293,8 +295,13 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
+    private int getElementOffset(VertexFormat vertexFormat, String name) {
+        var element = vertexFormat.getElement(name);
+        return element != null ? element.offset() : -1;
+    }
 
-    private void drawAnimateSpriteBlit(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, VertexFormat.@Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
+
+    private void drawAnimateSpriteBlit(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
         if (!(this.uniforms.get("SpriteAnimationInfo") instanceof Std140Reader reader)) {
             return;
         }
@@ -370,7 +377,7 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
-    private void executeLightmapDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, VertexFormat.@Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
+    private void executeLightmapDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
         if (!(this.uniforms.get("LightmapInfo") instanceof Std140Reader reader)) {
             return;
         }
@@ -443,10 +450,10 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
-    private void executeNoOpDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, VertexFormat.@Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
+    private void executeNoOpDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
     }
 
-    private void executeDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, VertexFormat.@Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
+    private void executeDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
         if (this.pipeline == RenderPipelines.END_PORTAL) {
             System.currentTimeMillis();
         }
@@ -538,7 +545,7 @@ public class SoftRenderPass implements RenderPassBackend {
             scissor = new Scissor(0, 0, colorOutput.width(), colorOutput.height());
         }
 
-        var vertexMode = this.pipeline.getVertexFormatMode();
+        var vertexMode = this.pipeline.getPrimitiveTopology();
 
         var uvOffset = sampler0 != null ? this.uvOffset : -1;
         var uv1Offset = sampler1 != null ? this.uv1Offset : -1;
@@ -553,7 +560,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var workMat = new Matrix4f();
         workMat.set(projMat).mul(modelViewMat);
 
-        if (vertexMode == VertexFormat.Mode.QUADS || vertexMode == VertexFormat.Mode.TRIANGLES) {
+        if (vertexMode == PrimitiveTopology.QUADS || vertexMode == PrimitiveTopology.TRIANGLES) {
             int layer = 0;
             int triangle = 0;
 
@@ -564,7 +571,7 @@ public class SoftRenderPass implements RenderPassBackend {
                     this.readVertexFull(
                             vertexBuffer,
                             position, colorModulator, workMat, textureMat, lightDir0, lightDir1,
-                            sampler1, sampler2, vertexMode == VertexFormat.Mode.TRIANGLES || (triangle & 1) == 0, hasLighting,
+                            sampler1, sampler2, vertexMode == PrimitiveTopology.TRIANGLES || (triangle & 1) == 0, hasLighting,
                             uvOffset, uv1Offset, uv2Offset, pos, a
                     );
 
@@ -608,7 +615,7 @@ public class SoftRenderPass implements RenderPassBackend {
 
                 triangle++;
             }
-        } else if (vertexMode == VertexFormat.Mode.TRIANGLE_FAN) {
+        } else if (vertexMode == PrimitiveTopology.TRIANGLE_FAN) {
             var pos0 = vertInit + getVertexPos(indexType, indexBuffer, indexStart, 0, baseVertex) * vertexLength;
             var pos1 = vertInit + getVertexPos(indexType, indexBuffer, indexStart, 1, baseVertex) * vertexLength;
 
@@ -659,7 +666,7 @@ public class SoftRenderPass implements RenderPassBackend {
                 }
                 copy(2, 1);
             }
-        } else if (vertexMode == VertexFormat.Mode.LINES) {
+        } else if (vertexMode == PrimitiveTopology.LINES) {
             int layer = 0;
 
             for (int i = 0; i < drawCount; i += 2) {
@@ -700,10 +707,10 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
-    private int getVertexPos(VertexFormat.@Nullable IndexType indexType, @Nullable ByteBuffer indexBuffer, int indexStart, int i, int baseVertex) {
+    private int getVertexPos(@Nullable IndexType indexType, @Nullable ByteBuffer indexBuffer, int indexStart, int i, int baseVertex) {
         return indexType == null
                 ? i + baseVertex
-                : indexType == VertexFormat.IndexType.INT
+                : indexType == IndexType.INT
                 ? indexBuffer.getInt(indexStart + i * 4) + baseVertex
                 : indexBuffer.getShort(indexStart + i * 2) + baseVertex;
     }
@@ -1095,13 +1102,12 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
 
-
     private interface DepthTestPredicate {
         boolean test(float image, float drawn);
     }
 
     public interface DrawCall {
-        void draw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, VertexFormat.@Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms);
+        void draw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms);
     }
 
     private record Scissor(int x1, int y1, int x2, int y2) {
