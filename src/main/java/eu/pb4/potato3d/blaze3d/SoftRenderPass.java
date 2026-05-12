@@ -182,9 +182,9 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
-    public void drawIndexed(int baseVertex, int firstIndex, int indexCount, int instanceCount) {
+    public void drawIndexed(int indexCount, int instanceCount, int firstIndex, int vertexOffset, int firstInstance) {
         try {
-            this.drawCall.draw(this.vertexBuffers[0], this.indexBuffer, baseVertex, firstIndex, indexCount, this.indexType, instanceCount, this.uniforms);
+            this.drawCall.draw(this.vertexBuffers[0], this.indexBuffer, vertexOffset, firstIndex, indexCount, this.indexType, instanceCount, this.uniforms);
         } catch (Throwable e) {
             System.currentTimeMillis();
             // Suffering
@@ -209,13 +209,23 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
-    public void draw(int firstVertex, int vertexCount) {
+    public void draw(int vertexCount, int instanceCount, int firstVertex, int firstInstance) {
         try {
-            this.drawCall.draw(this.vertexBuffers[0], null, firstVertex, 0, vertexCount, null, 1, this.uniforms);
+            this.drawCall.draw(this.vertexBuffers[0], null, firstVertex, 0, vertexCount, null, instanceCount, this.uniforms);
         } catch (Throwable e) {
             System.currentTimeMillis();
             // Pain
         }
+    }
+
+    @Override
+    public void drawIndirect(GpuBufferSlice commands, int drawCount) {
+
+    }
+
+    @Override
+    public void drawIndexedIndirect(GpuBufferSlice commands, int drawCount) {
+
     }
 
     @Override

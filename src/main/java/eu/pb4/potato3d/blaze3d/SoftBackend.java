@@ -30,7 +30,7 @@ public class SoftBackend implements GpuBackend {
     }
 
     @Override
-    public GpuDevice createDevice(long window, ShaderSource defaultShaderSource, GpuDebugOptions debugOptions) {
-        return new GpuDevice(new SoftDevice(window, defaultShaderSource, debugOptions));
+    public GpuDevice createDevice(long window, ShaderSource defaultShaderSource, GpuDebugOptions debugOptions, Runnable criticalShaderLoader) throws BackendCreationException {
+        return new GpuDevice(new SoftDevice(window, defaultShaderSource, debugOptions), criticalShaderLoader);
     }
 }
