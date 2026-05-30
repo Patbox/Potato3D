@@ -26,10 +26,12 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.util.Mth;
 import org.joml.*;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.PointerBuffer;
 
 import java.lang.Math;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -216,6 +218,26 @@ public class SoftRenderPass implements RenderPassBackend {
             System.currentTimeMillis();
             // Pain
         }
+    }
+
+    @Override
+    public void multiDrawIndexed(IntBuffer drawParameters, int instanceCount, int firstInstance, int drawCount) {
+
+    }
+
+    @Override
+    public void multiDrawIndexed(PointerBuffer firstIndexOffsets, IntBuffer indexCounts, IntBuffer vertexOffsets, int drawCount) {
+
+    }
+
+    @Override
+    public void multiDraw(IntBuffer drawParameters, int instanceCount, int firstInstance, int drawCount) {
+
+    }
+
+    @Override
+    public void multiDraw(IntBuffer firstVertices, IntBuffer vertexCounts, int drawCount) {
+
     }
 
     @Override

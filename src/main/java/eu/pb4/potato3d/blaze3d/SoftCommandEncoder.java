@@ -4,10 +4,7 @@ import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.GpuFence;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.CommandEncoderBackend;
-import com.mojang.blaze3d.systems.GpuQueryPool;
-import com.mojang.blaze3d.systems.RenderPassBackend;
-import com.mojang.blaze3d.systems.RenderPassDescriptor;
+import com.mojang.blaze3d.systems.*;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import eu.pb4.potato3d.Potato3D;
@@ -20,10 +17,16 @@ import java.nio.ByteBuffer;
 
 public class SoftCommandEncoder implements CommandEncoderBackend {
     public boolean isInRenderPass = false;
+    public final SoftTransientMemory memory = new SoftTransientMemory();
 
     @Override
     public void submit() {
 
+    }
+
+    @Override
+    public TransientMemory transientMemory() {
+        return this.memory;
     }
 
     @Override

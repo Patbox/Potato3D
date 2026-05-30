@@ -22,8 +22,8 @@ public class SoftDevice implements GpuDeviceBackend {
     private static final DeviceInfo DEVICE_INFO = new DeviceInfo("Software Renderer", "Tiny Potato",
             Potato3D.MOD_VERSION,
             SoftRenderPass.USE_ZERO_TO_ONE_Z, Potato3D.MOD_NAME, 0.1f,
-            new DeviceLimits(1, 1, Short.MAX_VALUE, Integer.MAX_VALUE, 1),
-            new DeviceFeatures(false, false, false, false,true), Set.of(),
+            new DeviceLimits(1, 1, Short.MAX_VALUE, Integer.MAX_VALUE, 1, 1),
+            new DeviceFeatures(false, false, false, false, false, false,true), Set.of(),
             new HintsAndWorkarounds(false, false),
             DeviceType.CPU
     );
