@@ -93,75 +93,44 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         dest.data().put((int) target.offset(), src.data(), (int) source.offset(), (int) source.length());
     }
 
-    @Override
-    public void writeToTexture(GpuTexture destination, NativeImage source, int mipLevel, int depthOrLayer, int destX, int destY, int width, int height, int sourceX, int sourceY) {
-        var dest = ((SoftTexture) destination);
 
-        switch (source.format()) {
-            case RGBA -> {
-                for (int x = 0; x < width; x++) {
-                    for (int y = 0; y < height; y++) {
-                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(ARGB.toABGR(source.getPixel(x + sourceX, y + sourceY))));
-                    }
-                }
-            }
-            case RGB -> {
-                for (int x = 0; x < width; x++) {
-                    for (int y = 0; y < height; y++) {
-                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(ARGB.toABGR(source.getPixel(x + sourceX, y + sourceY)) << 8 | 0xFF));
-                    }
-                }
-            }
-            case LUMINANCE -> {
-                for (int x = 0; x < width; x++) {
-                    for (int y = 0; y < height; y++) {
-                        var c = Byte.toUnsignedInt(source.getLuminanceOrAlpha(x + sourceX, y + sourceY));
-                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, RGBA.colorARGB(0xFF, c, c, c));
-                    }
-                }
-            }
-            case LUMINANCE_ALPHA -> {
-                // Todo
-            }
-        }
-    }
 
     @Override
-    public void writeToTexture(GpuTexture destination, ByteBuffer source, NativeImage.Format format, int mipLevel, int depthOrLayer, int destX, int destY, int width, int height) {
+    public void writeToTexture(GpuTexture destination, ByteBuffer source, int mipLevel, int depthOrLayer, int destX, int destY, int width, int height) {
         var dest = ((SoftTexture) destination);
 
-        switch (format) {
-            case RGBA -> {
-                for (int x = destX; x < destX + width; x++) {
-                    for (int y = destY; y < destY + height; y++) {
-                        dest.setRGBA(depthOrLayer, mipLevel, x, y, source.getInt());
+        switch (destination.getFormat()) {
+            case RGBA8_UNORM -> {
+                for (int y = destY; y < destY + height; y++) {
+                    for (int x = destX; x < destX + width; x++) {
+                        dest.setRGBA(depthOrLayer, mipLevel, x, y, Integer.reverseBytes(source.getInt()));
                     }
                 }
             }
-            case RGB -> {
-                for (int x = destX; x < destX + width; x++) {
-                    for (int y = destY; y < destY + height; y++) {
-                        dest.setRGBA(depthOrLayer, mipLevel, x, y,
+            case RGB8_UNORM -> {
+                for (int y = destY; y < destY + height; y++) {
+                    for (int x = destX; x < destX + width; x++) {
+                        dest.setRGBA(depthOrLayer, mipLevel, x, y, Integer.reverseBytes(
                                 Byte.toUnsignedInt(source.get()) << 24
                                         | Byte.toUnsignedInt(source.get()) << 16
                                         | Byte.toUnsignedInt(source.get()) << 8
-                                        | 0xFF
+                                        | 0xFF)
                         );
                     }
                 }
             }
-            case LUMINANCE -> {
-                for (int x = destX; x < destX + width; x++) {
-                    for (int y = destY; y < destY + height; y++) {
+            case R8_UNORM -> {
+                for (int y = destY; y < destY + height; y++) {
+                    for (int x = destX; x < destX + width; x++) {
                         dest.setRGBA(depthOrLayer, mipLevel, x, y,
                                 ARGB.setBrightness(0xFFFFFFFF, Byte.toUnsignedInt(source.get()))
                         );
                     }
                 }
             }
-            case LUMINANCE_ALPHA -> {
-                for (int x = destX; x < destX + width; x++) {
-                    for (int y = destY; y < destY + height; y++) {
+            case RG8_UNORM -> {
+                for (int y = destY; y < destY + height; y++) {
+                    for (int x = destX; x < destX + width; x++) {
                         var base = ARGB.setBrightness(0xFFFFFFFF, Byte.toUnsignedInt(source.get()));
                         dest.setRGBA(depthOrLayer, mipLevel, x, y,
                                 ARGB.color(Byte.toUnsignedInt(source.get()), base)
@@ -171,6 +140,47 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
             }
         }
     }
+
+    @Override
+    public void copyBufferToTexture(GpuBufferSlice source, int sourceX, int sourceY, int sourceWidth, int sourceHeight, GpuTexture destination, int destX, int destY, int width, int height, int mipLevel, int depthOrLayer) {
+        var dest = ((SoftTexture) destination);
+
+        var buf = ((SoftBuffer) source.buffer()).data();
+
+        switch (destination.getFormat()) {
+            case RGBA8_UNORM -> {
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        var i = ((x + sourceX) + (y + sourceY) * sourceWidth) * 4;
+
+                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(ARGB.toABGR(buf.getInt(i))));
+                    }
+                }
+            }
+            case RGB8_UNORM -> {
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        var i = (x + sourceX + (y + sourceY) * sourceWidth) * 3;
+
+                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(ARGB.toABGR(buf.getInt(i) & 0xFFFFFF) << 8 | 0xFF));
+                    }
+                }
+            }
+            case R8_UNORM -> {
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        var i = (x + sourceX + (y + sourceY) * sourceWidth);
+                        var c = Byte.toUnsignedInt(buf.get(i));
+                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, RGBA.colorARGB(0xFF, c, c, c));
+                    }
+                }
+            }
+            case RG8_UNORM -> {
+                // Todo
+            }
+        }
+    }
+
 
     @Override
     public void copyTextureToBuffer(GpuTexture source, GpuBuffer destination, long offset, Runnable callback, int mipLevel) {
@@ -221,7 +231,14 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         for (int x = destX; x < destX + width; x++) {
             for (int y = destY; y < destY + height; y++) {
                 dest.setRGBA(mipLevel, x, y, src.getRGBA(0, sourceX + x - destX, sourceY + y - destY));
-                dest.setDepth(mipLevel, x, y, src.getDepth(0, sourceX + x - destX, sourceY + y - destY));
+            }
+        }
+
+        if (dest.depth.length != 0 && src.depth.length != 0) {
+            for (int x = destX; x < destX + width; x++) {
+                for (int y = destY; y < destY + height; y++) {
+                    dest.setDepth(mipLevel, x, y, src.getDepth(0, sourceX + x - destX, sourceY + y - destY));
+                }
             }
         }
     }
