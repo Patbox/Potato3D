@@ -1,21 +1,16 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.IndexType;
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.CompareOp;
-import com.mojang.blaze3d.systems.GpuQueryPool;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderPassBackend;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.GpuQueryPool;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.pipeline.*;
+import com.mojang.renderpearl.api.textures.GpuSampler;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.api.vertex.VertexFormat;
+import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import eu.pb4.potato3d.RGBA;
 import eu.pb4.potato3d.blaze3d.shader.EndShader;
 import eu.pb4.potato3d.blaze3d.shader.SampledTexture;
@@ -256,6 +251,10 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
+    public void setPipeline(CompiledRenderPipeline pipeline) {
+        this.setPipeline(pipeline.info());
+    }
+
     public void setPipeline(RenderPipeline pipeline) {
         this.pipeline = pipeline;
         this.boundSamplers = BindGroupLayout.flattenSamplers(this.pipeline.getBindGroupLayouts());
@@ -271,7 +270,7 @@ public class SoftRenderPass implements RenderPassBackend {
             this.normalOffset = getElementOffset(vertexFormat, DefaultVertexFormat.NORMAL_SEMANTIC_NAME);
             this.lineWidthOffset = getElementOffset(vertexFormat, DefaultVertexFormat.LINE_WIDTH_SEMANTIC_NAME);
 
-            this.isGlint = this.pipeline.getColorTargetState().blendFunction().isPresent() && this.pipeline.getColorTargetState().blendFunction().get() == BlendFunction.GLINT;
+            this.isGlint = this.pipeline.getColorTargetStates()[0].blendFunction().isPresent() && this.pipeline.getColorTargetStates()[0].blendFunction().get() == BlendFunction.GLINT;
         }
 
         var depthStencilState = pipeline.getDepthStencilState();
@@ -291,7 +290,7 @@ public class SoftRenderPass implements RenderPassBackend {
             case NEVER_PASS -> (image, drawn) -> false;
         } : (a, b) -> true;
 
-        var colorState = pipeline.getColorTargetState();
+        var colorState = pipeline.getColorTargetStates()[0];
         if (pipeline == RenderPipelines.SOLID_TERRAIN) {
             this.blender = ColorBlender.SOLID;
         } else if (pipeline == RenderPipelines.CUTOUT_TERRAIN) {
@@ -342,7 +341,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var progress = baseVertex >> 3;
         var invProgress = maxProgress - progress;
 
-        var output = (SoftTexture) (RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() : this.colorTexture.texture());
+        var output = (SoftTexture) /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/ this.colorTexture.texture();//);
         var halfWidth = output.getWidth(0) / 2;
         var halfHeight = output.getHeight(0) / 2;
         var projMat = reader.getMat4f(new Matrix4f()).mul(reader.getMat4f(new Matrix4f()));
@@ -414,7 +413,7 @@ public class SoftRenderPass implements RenderPassBackend {
             return;
         }
 
-        var output = (SoftTexture) (RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() : this.colorTexture.texture());
+        var output = (SoftTexture) /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/ this.colorTexture.texture();//);
         float skyFactor = reader.putFloat();
         float blockFactor = reader.putFloat();
         float NightVisionFactor = reader.putFloat();
@@ -554,8 +553,8 @@ public class SoftRenderPass implements RenderPassBackend {
             reader.reset();
         }
 
-        var colorOutput = ((SoftTexture) (RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() : this.colorTexture.texture())).rgba[0];
-        var depthOutput = (RenderSystem.outputDepthTextureOverride != null ? RenderSystem.outputDepthTextureOverride.texture() : this.depthTexture != null ? this.depthTexture.texture() : null) instanceof SoftTexture softTexture ? softTexture.depth[0] : null;
+        var colorOutput = /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/ this.colorTexture.texture().rgba[0];//);
+        var depthOutput = (/*RenderSystem.outputDepthTextureOverride != null ? RenderSystem.outputDepthTextureOverride.texture() :*/ this.depthTexture != null ? this.depthTexture.texture() : null) instanceof SoftTexture softTexture ? softTexture.depth[0] : null;
 
         int width = colorOutput.width();
         int height = colorOutput.height();

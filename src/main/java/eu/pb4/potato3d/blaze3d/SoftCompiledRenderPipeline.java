@@ -1,16 +1,19 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.pipeline.CompiledRenderPipeline;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.ShaderSource;
+
+import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.ShaderSource;
 import org.jspecify.annotations.Nullable;
 
-public class SoftCompiledRenderPipeline implements CompiledRenderPipeline {
-    public SoftCompiledRenderPipeline(RenderPipeline pipeline, @Nullable ShaderSource shaderSource) {
+public record SoftCompiledRenderPipeline(RenderPipeline info) implements CompiledRenderPipeline {
+    @Override
+    public boolean isClosed() {
+        return false;
     }
 
     @Override
-    public boolean isValid() {
-        return true;
+    public void close() {
+
     }
 }

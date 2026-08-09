@@ -1,9 +1,10 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
 
-public class SoftTextureView extends GpuTextureView {
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.backend.common.BaseGpuTextureView;
+
+public class SoftTextureView extends BaseGpuTextureView {
     private final SoftTexture texturex;
 
     protected SoftTextureView(GpuTexture texture, int baseMipLevel, int mipLevels) {

@@ -1,18 +1,23 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.opengl.GlSurface;
-import com.mojang.blaze3d.pipeline.CompiledRenderPipeline;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.GpuDebugOptions;
-import com.mojang.blaze3d.shaders.ShaderSource;
-import com.mojang.blaze3d.systems.*;
-import com.mojang.blaze3d.textures.*;
+
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.commands.GpuQueryPool;
+import com.mojang.renderpearl.api.device.*;
+import com.mojang.renderpearl.api.pipeline.CompiledRenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.ShaderSource;
+import com.mojang.renderpearl.api.textures.*;
+import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
+import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
+import com.mojang.renderpearl.backend.api.GpuSurfaceBackend;
+import com.mojang.renderpearl.backend.opengl.GlSurface;
 import eu.pb4.potato3d.Potato3D;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.sdl.SDLVideo;
+import org.lwjgl.sdl.SDL_Surface;
 
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -23,22 +28,20 @@ public class SoftDevice implements GpuDeviceBackend {
             Potato3D.MOD_VERSION,
             SoftRenderPass.USE_ZERO_TO_ONE_Z, Potato3D.MOD_NAME, 0.1f,
             new DeviceLimits(1, 1, Short.MAX_VALUE, Integer.MAX_VALUE, 1, 1),
-            new DeviceFeatures(false, false, false, false, false, false,true), Set.of(),
+            new DeviceFeatures(false, false, false, false, false, false, true), Set.of(),
             new HintsAndWorkarounds(false, false),
             DeviceType.CPU
     );
-    private final long window;
-    private final ShaderSource shaderSource;
+    protected final long window;
     private final GpuDebugOptions gpuDebugOptions;
     private final int textureSize;
 
-    public SoftDevice(long windowHandle, ShaderSource defaultShaderSource, GpuDebugOptions debugOptions) {
+    public SoftDevice(long windowHandle, GpuDebugOptions debugOptions) {
         this.window = windowHandle;
-        this.shaderSource = defaultShaderSource;
         this.gpuDebugOptions = debugOptions;
         this.textureSize = Short.MAX_VALUE;
-        GLFW.glfwMakeContextCurrent(windowHandle);
-        GLFW.glfwSetWindowSizeLimits(windowHandle, -1, -1, this.textureSize, this.textureSize);
+
+        SDLVideo.SDL_GL_CreateContext(window);
         GL.createCapabilities();
     }
 
@@ -46,14 +49,14 @@ public class SoftDevice implements GpuDeviceBackend {
     public GpuSurfaceBackend createSurface(long windowHandle) {
         return new GlSurface(windowHandle) {
             public void blitFromTexture(final CommandEncoderBackend commandEncoder, final GpuTextureView textureView) {
-                ((SoftCommandEncoder)commandEncoder).presentTexture(textureView);
+                ((SoftCommandEncoder) commandEncoder).presentTexture(textureView);
             }
         };
     }
 
     @Override
     public CommandEncoderBackend createCommandEncoder() {
-        return new SoftCommandEncoder();
+        return new SoftCommandEncoder(this);
     }
 
     @Override
@@ -102,13 +105,8 @@ public class SoftDevice implements GpuDeviceBackend {
     }
 
     @Override
-    public CompiledRenderPipeline precompilePipeline(RenderPipeline pipeline, @Nullable ShaderSource shaderSource) {
-        return new SoftCompiledRenderPipeline(pipeline, shaderSource);
-    }
-
-    @Override
-    public void clearPipelineCache() {
-
+    public @Nullable CompiledRenderPipeline compilePipeline(RenderPipeline pipeline, ShaderSource shaderSource) {
+        return new SoftCompiledRenderPipeline(pipeline);
     }
 
     @Override

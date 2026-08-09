@@ -1,12 +1,14 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuSampler;
+
+
+import com.mojang.renderpearl.api.textures.AddressMode;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuSampler;
 
 import java.util.OptionalDouble;
 
-public class SoftSampler extends GpuSampler {
+public class SoftSampler implements GpuSampler {
     private final AddressMode addressModeU;
     private final AddressMode addressModeV;
     private final FilterMode minFilter;
@@ -51,6 +53,11 @@ public class SoftSampler extends GpuSampler {
     @Override
     public OptionalDouble getMaxLod() {
         return this.maxLod;
+    }
+
+    @Override
+    public boolean isClosed() {
+        return false;
     }
 
     @Override

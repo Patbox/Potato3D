@@ -1,9 +1,9 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.TransientMemory;
-import com.mojang.blaze3d.util.TransientBlockAllocator;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.TransientMemory;
+import com.mojang.renderpearl.backend.util.TransientBlockAllocator;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;

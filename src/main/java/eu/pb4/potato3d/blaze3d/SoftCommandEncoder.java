@@ -1,23 +1,33 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.GpuFence;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.*;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.TransientMemory;
+import com.mojang.renderpearl.api.commands.GpuFence;
+import com.mojang.renderpearl.api.commands.GpuQueryPool;
+import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
+import com.mojang.renderpearl.backend.api.RenderPassBackend;
 import eu.pb4.potato3d.Potato3D;
 import eu.pb4.potato3d.RGBA;
 import net.minecraft.util.ARGB;
 import org.joml.Vector4fc;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.sdl.SDLSurface;
+import org.lwjgl.sdl.SDLVideo;
 
 import java.nio.ByteBuffer;
 
 public class SoftCommandEncoder implements CommandEncoderBackend {
+    private final SoftDevice device;
     public boolean isInRenderPass = false;
     public final SoftTransientMemory memory = new SoftTransientMemory();
+
+    public SoftCommandEncoder(SoftDevice device) {
+        this.device = device;
+    }
 
     @Override
     public void submit() {
@@ -34,23 +44,23 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         SoftTextureView colorTexture = null;
         SoftTextureView depthTexture = null;
 
-        for (var color : descriptor.colorAttachments) {
+        for (var color : descriptor.colorAttachments()) {
             if (color.clearValue().isPresent()) {
                 ((SoftTexture) color.textureView().texture()).clear(color.textureView().baseMipLevel(), RGBA.fromVector4f(color.clearValue().get()));
             }
             colorTexture = (SoftTextureView) color.textureView();
         }
 
-        if (descriptor.depthAttachment != null) {
-            if ( descriptor.depthAttachment.clearValue().isPresent()) {
-                ((SoftTexture) descriptor.depthAttachment.textureView().texture()).clear(descriptor.depthAttachment.textureView().baseMipLevel(),
-                        descriptor.depthAttachment.clearValue().getAsDouble());
+        if (descriptor.depthAttachment() != null) {
+            if ( descriptor.depthAttachment().clearValue().isPresent()) {
+                ((SoftTexture) descriptor.depthAttachment().textureView().texture()).clear(descriptor.depthAttachment().textureView().baseMipLevel(),
+                        descriptor.depthAttachment().clearValue().getAsDouble());
             }
-            depthTexture = (SoftTextureView) descriptor.depthAttachment.textureView();
+            depthTexture = (SoftTextureView) descriptor.depthAttachment().textureView();
         }
 
 
-        return new SoftRenderPass(this, descriptor.label().get(), colorTexture, depthTexture, descriptor.renderArea);
+        return new SoftRenderPass(this, descriptor.label().get(), colorTexture, depthTexture, descriptor.renderArea());
     }
 
     @Override

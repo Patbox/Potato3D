@@ -1,14 +1,15 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.backend.common.BaseGpuTexture;
 import eu.pb4.potato3d.blaze3d.texture.DepthTexture;
 import eu.pb4.potato3d.blaze3d.texture.RGBATexture;
 import eu.pb4.potato3d.blaze3d.texture.TextureLike;
 
 import java.util.Arrays;
 
-public class SoftTexture extends GpuTexture {
+public class SoftTexture extends BaseGpuTexture {
     public final TextureLike[] texture;
     public final RGBATexture[] rgba;
     public final DepthTexture[] depth;

@@ -1,13 +1,13 @@
 package eu.pb4.potato3d.blaze3d;
 
-import com.mojang.blaze3d.GLFWErrorCapture;
-import com.mojang.blaze3d.shaders.GpuDebugOptions;
-import com.mojang.blaze3d.shaders.ShaderSource;
-import com.mojang.blaze3d.systems.BackendCreationException;
-import com.mojang.blaze3d.systems.GpuBackend;
-import com.mojang.blaze3d.systems.GpuDevice;
+
 import com.mojang.logging.LogUtils;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.renderpearl.api.device.BackendCreationException;
+import com.mojang.renderpearl.api.device.GpuBackend;
+import com.mojang.renderpearl.api.device.GpuDebugOptions;
+import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.frontend.FrontendGpuDevice;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 public class SoftBackend implements GpuBackend {
@@ -19,18 +19,32 @@ public class SoftBackend implements GpuBackend {
     }
 
     @Override
+    public void loadLibrary() throws BackendCreationException {
+
+    }
+
+    @Override
+    public void unloadLibrary() {
+
+    }
+
+    @Override
     public void setWindowHints() {
-        GLFW.glfwDefaultWindowHints();
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
-    }
-
-    @Override
-    public void handleWindowCreationErrors(GLFWErrorCapture.Error error) throws BackendCreationException {
 
     }
 
     @Override
-    public GpuDevice createDevice(long window, ShaderSource defaultShaderSource, GpuDebugOptions debugOptions, Runnable criticalShaderLoader) throws BackendCreationException {
-        return new GpuDevice(new SoftDevice(window, defaultShaderSource, debugOptions), criticalShaderLoader);
+    public long getWindowFlags() {
+        return 2;
+    }
+
+    @Override
+    public void handleWindowCreationErrors(@Nullable String error) throws BackendCreationException {
+
+    }
+
+    @Override
+    public GpuDevice createDevice(long window, GpuDebugOptions debugOptions) throws BackendCreationException {
+        return new FrontendGpuDevice(new SoftDevice(window, debugOptions));
     }
 }

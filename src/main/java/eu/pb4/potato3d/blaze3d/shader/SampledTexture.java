@@ -1,6 +1,6 @@
 package eu.pb4.potato3d.blaze3d.shader;
 
-import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.renderpearl.api.textures.AddressMode;
 import eu.pb4.potato3d.blaze3d.SoftSampler;
 import eu.pb4.potato3d.blaze3d.SoftTextureView;
 import net.minecraft.util.Mth;
