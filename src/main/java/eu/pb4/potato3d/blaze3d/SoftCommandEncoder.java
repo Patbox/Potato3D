@@ -7,16 +7,11 @@ import com.mojang.renderpearl.api.commands.GpuFence;
 import com.mojang.renderpearl.api.commands.GpuQueryPool;
 import com.mojang.renderpearl.api.commands.RenderPassDescriptor;
 import com.mojang.renderpearl.api.textures.GpuTexture;
-import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.api.RenderPassBackend;
-import eu.pb4.potato3d.Potato3D;
 import eu.pb4.potato3d.RGBA;
 import net.minecraft.util.ARGB;
 import org.joml.Vector4fc;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.sdl.SDLSurface;
-import org.lwjgl.sdl.SDLVideo;
 
 import java.nio.ByteBuffer;
 
@@ -52,7 +47,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         }
 
         if (descriptor.depthAttachment() != null) {
-            if ( descriptor.depthAttachment().clearValue().isPresent()) {
+            if (descriptor.depthAttachment().clearValue().isPresent()) {
                 ((SoftTexture) descriptor.depthAttachment().textureView().texture()).clear(descriptor.depthAttachment().textureView().baseMipLevel(),
                         descriptor.depthAttachment().clearValue().getAsDouble());
             }
@@ -80,9 +75,9 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
     }
 
     @Override
-    public void clearColorAndDepthTextures(GpuTexture colorTexture, Vector4fc clearColor, GpuTexture depthTexture, double clearDepth, int regionX, int regionY, int regionWidth, int regionHeight) {
-        ((SoftTexture) colorTexture).clear(RGBA.fromVector4f(clearColor), regionX, regionY, regionWidth, regionHeight);
-        ((SoftTexture) depthTexture).clear(clearDepth, regionX, regionY, regionWidth, regionHeight);
+    public void clearColorAndDepthTextures(GpuTexture colorTexture, Vector4fc clearColor, GpuTexture depthTexture, double clearDepth, int regionX, int regionY, int regionWidth, int regionHeight, int mipLevel) {
+        ((SoftTexture) colorTexture).clear(mipLevel, RGBA.fromVector4f(clearColor), regionX, regionY, regionWidth, regionHeight);
+        ((SoftTexture) depthTexture).clear(mipLevel, clearDepth, regionX, regionY, regionWidth, regionHeight);
     }
 
     @Override
@@ -102,7 +97,6 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
 
         dest.data().put((int) target.offset(), src.data(), (int) source.offset(), (int) source.length());
     }
-
 
 
     @Override
@@ -163,7 +157,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
                     for (int y = 0; y < height; y++) {
                         var i = ((x + sourceX) + (y + sourceY) * sourceWidth) * 4;
 
-                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(ARGB.toABGR(buf.getInt(i))));
+                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(buf.getInt(i)));
                     }
                 }
             }
@@ -172,7 +166,7 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
                     for (int y = 0; y < height; y++) {
                         var i = (x + sourceX + (y + sourceY) * sourceWidth) * 3;
 
-                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(ARGB.toABGR(buf.getInt(i) & 0xFFFFFF) << 8 | 0xFF));
+                        dest.setRGBA(depthOrLayer, mipLevel, destX + x, destY + y, Integer.reverseBytes(buf.getInt(i) & 0xFFFFFF) << 8 | 0xFF);
                     }
                 }
             }
@@ -198,9 +192,14 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
         var dest = ((SoftBuffer) destination).data();
 
         switch (source.getFormat().name().split("_")[0]) {
-            case "RGB8" -> {
+            case "RGBA8" -> {
                 for (int i = 0; i < src.length; i++) {
                     dest.putInt((int) (offset + i * 4), Integer.reverseBytes(src[i]));
+                }
+            }
+            case "RGB8" -> {
+                for (int i = 0; i < src.length; i++) {
+                    dest.putInt((int) (offset + i * 3), Integer.reverseBytes(src[i]));
                 }
             }
             case "R8" -> {
@@ -251,59 +250,6 @@ public class SoftCommandEncoder implements CommandEncoderBackend {
                 }
             }
         }
-    }
-
-    //@Override
-    public void presentTexture(GpuTextureView texture) {
-        // Only OpenGl needed
-        // Ideally I would kill it, but that might require swapping used window library
-        // And that is pain.
-
-        var outWidth = Potato3D.framebufferWidth;
-        var outHeight = Potato3D.framebufferHeight;
-        var width = texture.getWidth(0);
-        var height = texture.getHeight(0);
-        var txt = (SoftTexture) texture.texture();
-        GL11.glClearColor(0, 0, 0, 0);
-
-        int[] out;
-        if (outWidth == width && outHeight == height) {
-            out = new int[txt.rgba[0].data().length];
-
-            for (int i = 0; i < out.length; i++) {
-                var color = txt.rgba[0].data()[i];
-                out[i] = Integer.reverseBytes(color | 0xFF);
-            }
-        } else {
-            out = new int[outHeight * outWidth];
-
-            /*for (var y = 0; y < outHeight; y++) {
-                var gray = ARGB.gray((float) (y) / outHeight / 2 + 0.25f);
-
-                Arrays.fill(out, y * outHeight, (y + 1) * outWidth - 1, ARGB.toABGR(gray));
-            }*/
-
-            var sX = Math.min(outWidth / width, outHeight / height);
-            var offsetBaseX = (outWidth - width * sX) / 2;
-            var offsetBaseY = (outHeight - height * sX) / 2;
-            for (int y = 0; y < height; y++) {
-                var yOff = y * width;
-                var ys = (y * sX + offsetBaseY) * outWidth + offsetBaseX;
-                for (int x = 0; x < width; x++) {
-                    var xs = x * sX;
-                    var color = Integer.reverseBytes(txt.rgba[0].data()[x + yOff]);
-
-                    for (var xa = 0; xa < sX; xa++) {
-                        for (var ya = 0; ya < sX; ya++) {
-                            out[xs + xa + ys + ya * outWidth] = color;
-                        }
-                    }
-                }
-            }
-        }
-
-        GL11.glClearColor(0, 0, 0, 0);
-        GL11.glDrawPixels(outWidth, outHeight, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, out);
     }
 
     @Override

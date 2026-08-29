@@ -8,6 +8,7 @@ import com.mojang.renderpearl.api.device.GpuDebugOptions;
 import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.frontend.FrontendGpuDevice;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.sdl.SDLVideo;
 import org.slf4j.Logger;
 
 public class SoftBackend implements GpuBackend {
@@ -29,22 +30,12 @@ public class SoftBackend implements GpuBackend {
     }
 
     @Override
-    public void setWindowHints() {
-
+    public long createWindow(@Nullable String title, int width, int height, long flags) {
+        return SDLVideo.SDL_CreateWindow(title, width, height, 2L | flags);
     }
 
     @Override
-    public long getWindowFlags() {
-        return 2;
-    }
-
-    @Override
-    public void handleWindowCreationErrors(@Nullable String error) throws BackendCreationException {
-
-    }
-
-    @Override
-    public GpuDevice createDevice(long window, GpuDebugOptions debugOptions) throws BackendCreationException {
-        return new FrontendGpuDevice(new SoftDevice(window, debugOptions));
+    public GpuDevice createDevice(GpuDebugOptions debugOptions) throws BackendCreationException {
+        return new FrontendGpuDevice(new SoftDevice(debugOptions));
     }
 }

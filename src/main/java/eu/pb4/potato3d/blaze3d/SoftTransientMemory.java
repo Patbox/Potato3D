@@ -10,14 +10,14 @@ import java.nio.ByteBuffer;
 import java.util.List;
 
 public class SoftTransientMemory implements TransientMemory {
-    private final TransientBlockAllocator<Long> cpuBlockAllocator = new TransientBlockAllocator<>(524288L, 16L, TransientBlockAllocator.Allocator.create(MemoryUtil::nmemAlloc, MemoryUtil::nmemFree));
+    private final TransientBlockAllocator<TransientBlockAllocator.Allocator.CpuBlock> cpuBlockAllocator = new TransientBlockAllocator<>(524288L, 16L, TransientBlockAllocator.Allocator.CpuBlock.memalloc());
 
     @Override
     public ByteBuffer allocateCpu(final long size, final long alignment, final long minimumAllocation, final long elementSize) {
         assert size <= 2147483647L;
 
-        TransientBlockAllocator.Allocation<Long> alloc = this.cpuBlockAllocator.allocate(size, alignment, minimumAllocation, elementSize);
-        return MemoryUtil.memByteBuffer(alloc.block() + alloc.offset(), (int) alloc.size());
+        var alloc = this.cpuBlockAllocator.allocate(size, alignment, minimumAllocation, elementSize);
+        return MemoryUtil.memByteBuffer(alloc.block().address() + alloc.offset(), (int)alloc.size());
     }
 
     public void rotate() {

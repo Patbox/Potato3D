@@ -10,14 +10,15 @@ import com.mojang.renderpearl.api.pipeline.*;
 import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
+import com.mojang.renderpearl.backend.api.BackendRenderPipeline;
 import com.mojang.renderpearl.backend.api.RenderPassBackend;
+import com.mojang.renderpearl.util.TextureViewAndSampler;
 import eu.pb4.potato3d.RGBA;
 import eu.pb4.potato3d.blaze3d.shader.EndShader;
 import eu.pb4.potato3d.blaze3d.shader.SampledTexture;
 import eu.pb4.potato3d.blaze3d.shader.SoftShader;
 import eu.pb4.potato3d.blaze3d.texture.DepthTexture;
 import eu.pb4.potato3d.blaze3d.texture.RGBATexture;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.util.Mth;
 import org.joml.*;
 import org.jspecify.annotations.Nullable;
@@ -27,12 +28,13 @@ import java.lang.Math;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.ToIntBiFunction;
+import java.util.stream.Collectors;
 
 public class SoftRenderPass implements RenderPassBackend {
     public static final boolean USE_ZERO_TO_ONE_Z = true;
@@ -53,7 +55,7 @@ public class SoftRenderPass implements RenderPassBackend {
     private final Scissor defaultScissor;
 
     private boolean closed;
-    private RenderPipeline pipeline;
+    private SoftRenderPipeline pipeline;
     private ByteBuffer indexBuffer;
     private IndexType indexType = IndexType.INT;
     private Scissor scissor;
@@ -72,8 +74,9 @@ public class SoftRenderPass implements RenderPassBackend {
     private int normalOffset;
     private int lineWidthOffset;
     private boolean isGlint;
-    private List<String> boundSamplers = List.of();
+    private Map<String, BindGroupLayout.UniformDescription> boundUniforms = new HashMap<>();
     private DrawCall drawCall = this::executeDraw;
+    private ByteBuffer constants;
 
     public SoftRenderPass(SoftCommandEncoder encoder, String label, SoftTextureView colorTexture, @Nullable SoftTextureView depthTexture, RenderPass.RenderArea renderArea) {
         this.encoder = encoder;
@@ -141,20 +144,21 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
-    public void bindTexture(String name, @Nullable GpuTextureView textureView, @Nullable GpuSampler sampler) {
-        this.binds.put(name, new SampledTexture((SoftTextureView) textureView, (SoftSampler) sampler));
-    }
-
-    @Override
-    public void setUniform(String name, GpuBuffer value) {
-        this.uniforms.put(name, Std140Reader.wrap(((SoftBuffer) value).data()));
-    }
-
-    @Override
-    public void setUniform(String name, GpuBufferSlice value) {
-        var buf = ((SoftBuffer) value.buffer()).data().slice((int) value.offset(), (int) value.length());
-        buf.order(ByteOrder.LITTLE_ENDIAN);
-        this.uniforms.put(name, Std140Reader.wrap(buf));
+    public void setUniform(int index, @Nullable Object value) {
+        var type = this.pipeline.uniforms().get(index);
+        if (value == null) {
+            this.uniforms.remove(type.name());
+        } else if (value instanceof GpuBuffer) {
+            this.uniforms.put(type.name(), Std140Reader.wrap(((SoftBuffer) value).data()));
+        } else if (value instanceof GpuBufferSlice(GpuBuffer buffer, long offset, long length)) {
+            var buf = ((SoftBuffer) buffer).data().slice((int) offset, (int) length);
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            this.uniforms.put(type.name(), Std140Reader.wrap(buf));
+        } else if (value instanceof TextureViewAndSampler(GpuTextureView view, GpuSampler sampler)) {
+            this.binds.put(type.name(), new SampledTexture((SoftTextureView) view, (SoftSampler) sampler));
+        } else {
+            System.out.println("Unhandled uniform: " + value);
+        }
     }
 
     @Override
@@ -188,7 +192,7 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
-    @Override
+    /*@Override
     public <T> void drawMultipleIndexed(Collection<RenderPass.Draw<T>> draws, @Nullable GpuBuffer defaultIndexBuffer, @Nullable IndexType defaultIndexType, Collection<String> dynamicUniforms, T uniformArgument) {
         try {
             for (var draw : draws) {
@@ -204,6 +208,7 @@ public class SoftRenderPass implements RenderPassBackend {
             // Suffering
         }
     }
+     */
 
     @Override
     public void draw(int vertexCount, int instanceCount, int firstVertex, int firstInstance) {
@@ -251,17 +256,19 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     @Override
-    public void setPipeline(CompiledRenderPipeline pipeline) {
-        this.setPipeline(pipeline.info());
+    public void pushConstants(ByteBuffer value) {
+        this.constants = value;
     }
 
-    public void setPipeline(RenderPipeline pipeline) {
+    @Override
+    public void setPipeline(BackendRenderPipeline pipeline_) {
+        var pipeline = (SoftRenderPipeline) pipeline_;
         this.pipeline = pipeline;
-        this.boundSamplers = BindGroupLayout.flattenSamplers(this.pipeline.getBindGroupLayouts());
+        this.boundUniforms = this.pipeline.uniforms().stream().collect(Collectors.toMap(BindGroupLayout.UniformDescription::name, Function.identity()));
 
-        var vertexFormat = this.pipeline.getVertexFormatBinding(0);
+        var vertexFormat = this.pipeline.renderPipeline().getVertexFormatBinding(0);
         if (vertexFormat != null) {
-            this.vertexLength = vertexFormat.getVertexSize();
+            this.vertexLength = this.pipeline.vertexBuffers().isEmpty() ? vertexFormat.getVertexSize() : this.pipeline.vertexBuffers().getFirst().stride();
             this.positionOffset = getElementOffset(vertexFormat, DefaultVertexFormat.POSITION_SEMANTIC_NAME);
             this.colorOffset = getElementOffset(vertexFormat, DefaultVertexFormat.COLOR_SEMANTIC_NAME);
             this.uvOffset = getElementOffset(vertexFormat, DefaultVertexFormat.UV0_SEMANTIC_NAME);
@@ -270,10 +277,10 @@ public class SoftRenderPass implements RenderPassBackend {
             this.normalOffset = getElementOffset(vertexFormat, DefaultVertexFormat.NORMAL_SEMANTIC_NAME);
             this.lineWidthOffset = getElementOffset(vertexFormat, DefaultVertexFormat.LINE_WIDTH_SEMANTIC_NAME);
 
-            this.isGlint = this.pipeline.getColorTargetStates()[0].blendFunction().isPresent() && this.pipeline.getColorTargetStates()[0].blendFunction().get() == BlendFunction.GLINT;
+            this.isGlint = this.pipeline.colorTargetStates().getFirst().blendFunction().isPresent() && this.pipeline.colorTargetStates().getFirst().blendFunction().get() == BlendFunction.GLINT;
         }
 
-        var depthStencilState = pipeline.getDepthStencilState();
+        var depthStencilState = pipeline.depthStencilState();
         this.writeDepth = depthStencilState != null && depthStencilState.writeDepth();
         this.limitDepth = depthStencilState != null && depthStencilState.depthTest() != CompareOp.ALWAYS_PASS;
         //this.depthBiasConstant = depthStencilState != null ? depthStencilState.depthBiasConstant() * 1.0E-20F : 0;
@@ -290,10 +297,10 @@ public class SoftRenderPass implements RenderPassBackend {
             case NEVER_PASS -> (image, drawn) -> false;
         } : (a, b) -> true;
 
-        var colorState = pipeline.getColorTargetStates()[0];
-        if (pipeline == RenderPipelines.SOLID_TERRAIN) {
+        var colorState = pipeline.colorTargetStates().getFirst();
+        if (pipeline.name().equals("minecraft:pipeline/solid_terrain")) {
             this.blender = ColorBlender.SOLID;
-        } else if (pipeline == RenderPipelines.CUTOUT_TERRAIN) {
+        } else if (pipeline.name().equals("minecraft:pipeline/cutout_terrain")) {
             this.blender = ColorBlender.CUTOUT;
         } else if (colorState.blendFunction().isEmpty()) {
             this.blender = ColorBlender.CUTOUT;
@@ -309,17 +316,17 @@ public class SoftRenderPass implements RenderPassBackend {
             this.blender = ColorBlender.PREMULTIPLIED_BLEND;
         } else if (colorState.blendFunction().get() == BlendFunction.TRANSLUCENT) {
             this.blender = ColorBlender.ALPHA_BLEND;
-        } else if (pipeline == RenderPipelines.CRUMBLING) {
+        } else if (pipeline.name().equals("minecraft:pipeline/crumbling")) {
             this.blender = ColorBlender.MULTIPLY;
         } else {
             this.blender = ColorBlender.PREMULTIPLIED_BLEND;
         }
 
-        if (this.pipeline == RenderPipelines.ANIMATE_SPRITE_BLIT || this.pipeline == RenderPipelines.ANIMATE_SPRITE_INTERPOLATE) {
+        if (pipeline.name().startsWith("minecraft:pipeline/animate_sprite")) {
             this.drawCall = this::drawAnimateSpriteBlit;
-        } else if (this.pipeline == RenderPipelines.LIGHTMAP) {
+        } else if (pipeline.name().equals("minecraft:pipeline/lightmap")) {
             this.drawCall = this::executeLightmapDraw;
-        } else if (this.pipeline == RenderPipelines.VIGNETTE) {
+        } else if (pipeline.name().equals("minecraft:pipeline/vignette")) {
             this.drawCall = this::executeNoOpDraw;
         } else {
             this.drawCall = this::executeDraw;
@@ -327,8 +334,30 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     private int getElementOffset(VertexFormat vertexFormat, String name) {
+        if (this.pipeline.name().endsWith("text")) {
+            System.currentTimeMillis();
+        }
+
         var element = vertexFormat.getElement(name);
-        return element != null ? element.offset() : -1;
+        if (element == null) {
+            return -1;
+        }
+
+        for (var s : this.pipeline.shaders()) {
+            for (var in : Objects.requireNonNull(s.module().getReflectionInfoIfAvailable()).inputs()) {
+                if (in.name().equals(name)) {
+                    var location = in.location();
+
+                    for (var x : this.pipeline.attribBindings()) {
+                        if (x.location() == location) {
+                            return x.offset();
+                        }
+                    }
+                }
+            }
+        }
+
+        return -1;
     }
 
 
@@ -348,6 +377,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var xPadding = reader.putFloat();
         var yPadding = reader.putFloat();
         var mipmapLevels = reader.putInt();
+
         var min = projMat.transformProject(new Vector3f(0)).mul(halfWidth, halfHeight, 1).add(halfWidth, halfHeight, 0);
         var max = projMat.transformProject(new Vector3f(1)).mul(halfWidth, halfHeight, 1).add(halfWidth, halfHeight, 0);
 
@@ -361,7 +391,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var lengthY = (maxY - minY);
 
 
-        if (this.pipeline == RenderPipelines.ANIMATE_SPRITE_BLIT) {
+        if (pipeline.name().endsWith("_blit")) {
             SampledTexture sprite = this.binds.get("Sprite");
 
             var spriteWidth = sprite.texture().getWidth(0);
@@ -379,7 +409,7 @@ public class SoftRenderPass implements RenderPassBackend {
                 }
             }
 
-        } else if (this.pipeline == RenderPipelines.ANIMATE_SPRITE_INTERPOLATE) {
+        } else if (this.pipeline.name().endsWith("_interpolate")) {
             SampledTexture currentSprite = this.binds.get("CurrentSprite");
             SampledTexture nextSprite = this.binds.get("NextSprite");
 
@@ -485,8 +515,8 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     private void executeDraw(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
-        if (this.pipeline == RenderPipelines.END_PORTAL) {
-            System.currentTimeMillis();
+        if (this.pipeline.name().equals("minecraft:pipeline/item_cutout")) {
+            //System.currentTimeMillis();
         }
 
         var projMat = new Matrix4f();
@@ -499,32 +529,32 @@ public class SoftRenderPass implements RenderPassBackend {
 
         var position = new Vector3f();
 
-        SoftShader sampler0 = this.boundSamplers.contains("Sampler0") ? this.binds.get("Sampler0") : null;
-        SampledTexture sampler1 = this.boundSamplers.contains("Sampler1") ? this.binds.get("Sampler1") : null;
-        SampledTexture sampler2 = this.boundSamplers.contains("Sampler2") ? this.binds.get("Sampler2") : null;
+        SoftShader sampler0 = this.boundUniforms.containsKey("Sampler0") ? this.binds.get("Sampler0") : null;
+        SampledTexture sampler1 = this.boundUniforms.containsKey("Sampler1") ? this.binds.get("Sampler1") : null;
+        SampledTexture sampler2 = this.boundUniforms.containsKey("Sampler2") ? this.binds.get("Sampler2") : null;
 
         var glintAlpha = 1f;
         var gameTime = 1f;
 
-        if (uniforms.get("Globals") instanceof Std140Reader reader) {
+        if (this.boundUniforms.containsKey("Globals") && uniforms.get("Globals") instanceof Std140Reader reader) {
             reader.getIVec3(cameraBlockPos);
-            reader.getVec3(cameraOffset);
-            reader.getVec2(); // ScreenSize
             glintAlpha = reader.putFloat();
+            reader.getVec3(cameraOffset);
             gameTime = reader.putFloat();
+            reader.getVec2(); // ScreenSize
             reader.reset();
         }
 
-        if (uniforms.get("Projection") instanceof Std140Reader reader) {
+        if (this.boundUniforms.containsKey("Projection") && uniforms.get("Projection") instanceof Std140Reader reader) {
             reader.getMat4f(projMat);
             reader.reset();
         }
 
-        if (uniforms.get("DynamicTransforms") instanceof Std140Reader reader) {
+        if (this.boundUniforms.containsKey("DynamicTransforms") && uniforms.get("DynamicTransforms") instanceof Std140Reader reader) {
             reader.getMat4f(modelViewMat);
+            reader.getMat4f(textureMat);
             reader.getVec4(colorModulator);
             reader.getVec3(modelOffset);
-            reader.getMat4f(textureMat);
             reader.reset();
         }
 
@@ -532,18 +562,22 @@ public class SoftRenderPass implements RenderPassBackend {
         var hasLighting = false;
         Vector3f lightDir0 = new Vector3f();
         Vector3f lightDir1 = new Vector3f();
-        if (uniforms.get("Lighting") instanceof Std140Reader reader) {
+        if (this.boundUniforms.containsKey("Lighting") && uniforms.get("Lighting") instanceof Std140Reader reader) {
             reader.getVec3(lightDir0);
             reader.getVec3(lightDir1);
             reader.reset();
             hasLighting = true;
         }
 
-        if (uniforms.get("ChunkSection") instanceof Std140Reader reader) {
+        if (this.boundUniforms.containsKey("TerrainUniform") && uniforms.get("TerrainUniform") instanceof Std140Reader reader) {
             reader.getMat4f(modelViewMat);
-            reader.putFloat(); // ChunkVisibility
-            reader.getIVec2(new Vector2i()); // Texture Size
+            reader.getIVec2(new Vector2i());
+            reader.reset();
+        }
+
+        if (this.boundUniforms.containsKey("ChunkSection") && uniforms.get("ChunkSection") instanceof Std140Reader reader) {
             var chunkPos = reader.getIVec3();
+            reader.putFloat(); // ChunkVisibility
 
             position.set(
                     chunkPos.x - cameraBlockPos.x + cameraOffset.x,
@@ -576,15 +610,15 @@ public class SoftRenderPass implements RenderPassBackend {
             scissor = new Scissor(0, 0, colorOutput.width(), colorOutput.height());
         }
 
-        var vertexMode = this.pipeline.getPrimitiveTopology();
+        var vertexMode = this.pipeline.primitiveTopology();
 
         var uvOffset = sampler0 != null ? this.uvOffset : -1;
         var uv1Offset = sampler1 != null ? this.uv1Offset : -1;
         var uv2Offset = sampler2 != null ? this.uv2Offset : -1;
 
-        if (this.pipeline == RenderPipelines.END_PORTAL) {
+        if (this.pipeline.name().equals("minecraft:pipeline/end_portal")) {
             sampler0 = new EndShader((SampledTexture) sampler0, 0x444444FF, (int) System.currentTimeMillis() / 2);
-        } else if (this.pipeline == RenderPipelines.END_GATEWAY) {
+        } else if (this.pipeline.name().equals("minecraft:pipeline/end_gateway")) {
             sampler0 = new EndShader((SampledTexture) sampler0, 0x555577FF, (int) System.currentTimeMillis() / 3);
         }
 
@@ -620,7 +654,7 @@ public class SoftRenderPass implements RenderPassBackend {
                     vertStart = 3;
                 }
 
-                if (this.pipeline == RenderPipelines.PANORAMA) {
+                if (this.pipeline.name().equals("minecraft:pipeline/panorama")) {
                     layer = switch (triangle / 2) {
                         case 0 -> 4; // B
                         case 1 -> 0; // C
@@ -846,6 +880,10 @@ public class SoftRenderPass implements RenderPassBackend {
     }
 
     private int clipTriangleWFast(int out) {
+        if (Float.isNaN(pos[0].w) || Float.isNaN(pos[1].w) || Float.isNaN(pos[2].w)) {
+            return 0;
+        }
+
         final var clipSpace = 0.05f;
         var clip0 = pos[0].w < clipSpace ? 1 : 0;
         var clip1 = pos[1].w < clipSpace ? 1 : 0;
@@ -957,7 +995,7 @@ public class SoftRenderPass implements RenderPassBackend {
         var calculateZ = vec0.z != vec1.z || vec0.z != vec2.z;
 
         var totalArea = signedTriangleArea(vec0.x, vec0.y, vec1.x, vec1.y, vec2.x, vec2.y);
-        if (totalArea < 0.05f && (this.pipeline.isCull() || totalArea > -0.05f)) return;
+        if (totalArea < 0.05f && (this.pipeline.cull() || totalArea > -0.05f)) return;
         var side = Mth.sign(totalArea);
 
         totalArea = 1 / totalArea;

@@ -70,7 +70,6 @@ public class Std140Reader {
     public Vector3f getVec3(Vector3f vec) {
         this.align(16);
         vec.set(this.buffer.getFloat(), this.buffer.getFloat(), this.buffer.getFloat());
-        this.buffer.position(this.buffer.position() + 4);
         return vec;
     }
 
@@ -81,7 +80,6 @@ public class Std140Reader {
     public Vector3i getIVec3(Vector3i vec) {
         this.align(16);
         vec.set(this.buffer.getInt(), this.buffer.getInt(), this.buffer.getInt());
-        this.buffer.position(this.buffer.position() + 4);
         return vec;
     }
 
