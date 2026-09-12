@@ -5,12 +5,14 @@ import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.commands.GpuQueryPool;
 import com.mojang.renderpearl.api.device.*;
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout;
 import com.mojang.renderpearl.api.textures.*;
 import com.mojang.renderpearl.backend.api.BackendRenderPipeline;
 import com.mojang.renderpearl.backend.api.CommandEncoderBackend;
 import com.mojang.renderpearl.backend.api.GpuDeviceBackend;
 import com.mojang.renderpearl.backend.api.GpuSurfaceBackend;
 import eu.pb4.potato3d.Potato3D;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.sdl.*;
@@ -18,7 +20,9 @@ import org.lwjgl.sdl.*;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SoftDevice implements GpuDeviceBackend {
@@ -184,13 +188,40 @@ public class SoftDevice implements GpuDeviceBackend {
                         return null;
                     }
 
+                    var pipeline = RenderPipelines.requiredPipelines().stream().filter(x -> x.getLocation().toString().equals(pipelineCreateInfo.name())).findAny().orElse(RenderPipelines.VIGNETTE);
 
-                    return new SoftRenderPipeline(pipelineCreateInfo.name(), pipelineCreateInfo.shaders(), pipelineCreateInfo.vertexBuffers(), pipelineCreateInfo.attribBindings(),
-                            pipelineCreateInfo.uniforms(), pipelineCreateInfo.pushConstantsSize(), pipelineCreateInfo.depthStencilState(), pipelineCreateInfo.polygonMode(), pipelineCreateInfo.cull(),
+                    var elementPos = new Object2IntOpenHashMap<String>();
+                    elementPos.defaultReturnValue(-1);
+
+                    if (!pipeline.getVertexFormatBindings().isEmpty() && pipeline.getVertexFormatBindings().getFirst() != null) {
+                        for (var element : pipeline.getVertexFormatBindings().getFirst().getElements()) {
+                            for (var s : pipelineCreateInfo.shaders()) {
+                                for (var in : Objects.requireNonNull(s.module().reflect().inputs())) {
+                                    if (in.name().equals(element.name())) {
+                                        var location = in.location();
+                                        for (var x : pipelineCreateInfo.attribBindings()) {
+                                            if (x.location() == location) {
+                                                elementPos.put(element.name(), x.offset());
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    return new SoftRenderPipeline(pipelineCreateInfo.name(), pipelineCreateInfo.shaders(),
+                            pipelineCreateInfo.vertexBuffers().isEmpty() ? 0 : pipelineCreateInfo.vertexBuffers().getFirst().stride(),
+                            elementPos,
+                            pipelineCreateInfo.uniforms(),
+                            pipelineCreateInfo.uniforms().stream().collect(Collectors.toMap(BindGroupLayout.UniformDescription::name, Function.identity())),
+                            pipelineCreateInfo.pushConstantsSize(), pipelineCreateInfo.depthStencilState(), pipelineCreateInfo.polygonMode(), pipelineCreateInfo.cull(),
                             pipelineCreateInfo.colorTargetStates(), pipelineCreateInfo.primitiveTopology(),
-                            RenderPipelines.requiredPipelines().stream().filter(x -> x.getLocation().toString().equals(pipelineCreateInfo.name())).findAny().orElse(RenderPipelines.VIGNETTE)
+                            pipeline
                     );
                 } catch (Throwable e) {
+                    e.printStackTrace();
                     return null;
                 }
             }

@@ -23,6 +23,7 @@ import net.minecraft.util.Mth;
 import org.joml.*;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.system.MemoryUtil;
 
 import java.lang.Math;
 import java.nio.ByteBuffer;
@@ -264,21 +265,18 @@ public class SoftRenderPass implements RenderPassBackend {
     public void setPipeline(BackendRenderPipeline pipeline_) {
         var pipeline = (SoftRenderPipeline) pipeline_;
         this.pipeline = pipeline;
-        this.boundUniforms = this.pipeline.uniforms().stream().collect(Collectors.toMap(BindGroupLayout.UniformDescription::name, Function.identity()));
+        this.boundUniforms = this.pipeline.uniformByName();
 
-        var vertexFormat = this.pipeline.renderPipeline().getVertexFormatBinding(0);
-        if (vertexFormat != null) {
-            this.vertexLength = this.pipeline.vertexBuffers().isEmpty() ? vertexFormat.getVertexSize() : this.pipeline.vertexBuffers().getFirst().stride();
-            this.positionOffset = getElementOffset(vertexFormat, DefaultVertexFormat.POSITION_SEMANTIC_NAME);
-            this.colorOffset = getElementOffset(vertexFormat, DefaultVertexFormat.COLOR_SEMANTIC_NAME);
-            this.uvOffset = getElementOffset(vertexFormat, DefaultVertexFormat.UV0_SEMANTIC_NAME);
-            this.uv1Offset = getElementOffset(vertexFormat, DefaultVertexFormat.UV1_SEMANTIC_NAME);
-            this.uv2Offset = getElementOffset(vertexFormat, DefaultVertexFormat.UV2_SEMANTIC_NAME);
-            this.normalOffset = getElementOffset(vertexFormat, DefaultVertexFormat.NORMAL_SEMANTIC_NAME);
-            this.lineWidthOffset = getElementOffset(vertexFormat, DefaultVertexFormat.LINE_WIDTH_SEMANTIC_NAME);
+        this.vertexLength = this.pipeline.vertexLength();
+        this.positionOffset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.POSITION_SEMANTIC_NAME);
+        this.colorOffset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.COLOR_SEMANTIC_NAME);
+        this.uvOffset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.UV0_SEMANTIC_NAME);
+        this.uv1Offset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.UV1_SEMANTIC_NAME);
+        this.uv2Offset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.UV2_SEMANTIC_NAME);
+        this.normalOffset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.NORMAL_SEMANTIC_NAME);
+        this.lineWidthOffset = this.pipeline.elementPosition().getInt(DefaultVertexFormat.LINE_WIDTH_SEMANTIC_NAME);
 
-            this.isGlint = this.pipeline.colorTargetStates().getFirst().blendFunction().isPresent() && this.pipeline.colorTargetStates().getFirst().blendFunction().get() == BlendFunction.GLINT;
-        }
+        this.isGlint = this.pipeline.colorTargetStates().getFirst().blendFunction().isPresent() && this.pipeline.colorTargetStates().getFirst().blendFunction().get() == BlendFunction.GLINT;
 
         var depthStencilState = pipeline.depthStencilState();
         this.writeDepth = depthStencilState != null && depthStencilState.writeDepth();
@@ -333,34 +331,6 @@ public class SoftRenderPass implements RenderPassBackend {
         }
     }
 
-    private int getElementOffset(VertexFormat vertexFormat, String name) {
-        if (this.pipeline.name().endsWith("text")) {
-            System.currentTimeMillis();
-        }
-
-        var element = vertexFormat.getElement(name);
-        if (element == null) {
-            return -1;
-        }
-
-        for (var s : this.pipeline.shaders()) {
-            for (var in : Objects.requireNonNull(s.module().getReflectionInfoIfAvailable()).inputs()) {
-                if (in.name().equals(name)) {
-                    var location = in.location();
-
-                    for (var x : this.pipeline.attribBindings()) {
-                        if (x.location() == location) {
-                            return x.offset();
-                        }
-                    }
-                }
-            }
-        }
-
-        return -1;
-    }
-
-
     private void drawAnimateSpriteBlit(ByteBuffer vertexBuffer, @Nullable ByteBuffer indexBuffer, int baseVertex, int firstIndex, int drawCount, @Nullable IndexType indexType, int instanceCount, Map<String, Std140Reader> uniforms) {
         if (!(this.uniforms.get("SpriteAnimationInfo") instanceof Std140Reader reader)) {
             return;
@@ -370,7 +340,8 @@ public class SoftRenderPass implements RenderPassBackend {
         var progress = baseVertex >> 3;
         var invProgress = maxProgress - progress;
 
-        var output = (SoftTexture) /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/ this.colorTexture.texture();//);
+        /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/
+        var output = this.colorTexture.texture();//);
         var halfWidth = output.getWidth(0) / 2;
         var halfHeight = output.getHeight(0) / 2;
         var projMat = reader.getMat4f(new Matrix4f()).mul(reader.getMat4f(new Matrix4f()));
@@ -443,7 +414,8 @@ public class SoftRenderPass implements RenderPassBackend {
             return;
         }
 
-        var output = (SoftTexture) /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/ this.colorTexture.texture();//);
+        /*(RenderSystem.outputColorTextureOverride != null ? RenderSystem.outputColorTextureOverride.texture() :*/
+        var output = this.colorTexture.texture();//);
         float skyFactor = reader.putFloat();
         float blockFactor = reader.putFloat();
         float NightVisionFactor = reader.putFloat();
@@ -795,22 +767,21 @@ public class SoftRenderPass implements RenderPassBackend {
 
         if (positionOffset != -1) {
             this.pos[a].set(
-                    vertexBuffer.getFloat(pos + positionOffset) + position.x,
-                    vertexBuffer.getFloat(pos + positionOffset + 4) + position.y,
-                    vertexBuffer.getFloat(pos + positionOffset + 8) + position.z,
+                    MemoryUtil.memGetFloat(vertexBuffer, pos + positionOffset) + position.x,
+                    MemoryUtil.memGetFloat(vertexBuffer, pos + positionOffset + 4) + position.y,
+                    MemoryUtil.memGetFloat(vertexBuffer, pos + positionOffset + 8) + position.z,
                     1
             );
 
-
-            //vec[a].add(Mth.sin(vec[a].x) * 0.2f, Mth.sin(vec[a].y)  * 0.2f, Mth.sin(vec[a].z) * 0.2f, 0);
-            //vec[a].set(Math.atan(vec[a].x * 0.2) * 5, Math.atan(vec[a].y  * 0.2) * 5, Math.atan(vec[a].z  * 0.2) * 5, 1);
+            //this.pos[a].add(Mth.sin(this.pos[a].x) * 0.2f, Mth.sin(this.pos[a].y)  * 0.2f, Mth.sin(this.pos[a].z) * 0.2f, 0);
+            //this.pos[a].set(Math.atan(this.pos[a].x * 0.2f) * 5f, Math.atan(this.pos[a].y * 0.2f) * 5f, Math.atan(this.pos[a].z * 0.2f) * 5f, this.pos[a].w);
             workMat.transform(this.pos[a]);
         } else {
             this.pos[a].set(0);
         }
 
         if (colorOffset != -1) {
-            var color = Integer.reverseBytes(vertexBuffer.getInt(pos + colorOffset));
+            var color = Integer.reverseBytes(MemoryUtil.memGetInt(vertexBuffer, pos + colorOffset));
 
             colors[a].set(
                     RGBA.redFloat(color),
@@ -823,7 +794,7 @@ public class SoftRenderPass implements RenderPassBackend {
         }
 
         if (uvOffset != -1) {
-            uvs[a].set(vertexBuffer.getFloat(pos + uvOffset), vertexBuffer.getFloat(pos + uvOffset + 4));
+            uvs[a].set(MemoryUtil.memGetFloat(vertexBuffer, pos + uvOffset), MemoryUtil.memGetFloat(vertexBuffer, pos + uvOffset + 4));
 
             if (isGlint) {
                 tmpVec4f.set(uvs[a], 0, 1);
@@ -838,9 +809,9 @@ public class SoftRenderPass implements RenderPassBackend {
 
         if (normalOffset != -1) {
             normals[a].set(
-                    vertexBuffer.get(pos + normalOffset) / 128f,
-                    vertexBuffer.get(pos + normalOffset + 1) / 128f,
-                    vertexBuffer.get(pos + normalOffset + 2) / 128f
+                    MemoryUtil.memGet(vertexBuffer, pos + normalOffset) / 128f,
+                    MemoryUtil.memGet(vertexBuffer, pos + normalOffset + 1) / 128f,
+                    MemoryUtil.memGet(vertexBuffer, pos + normalOffset + 2) / 128f
             );
 
             if (hasLighting) {
@@ -855,8 +826,8 @@ public class SoftRenderPass implements RenderPassBackend {
         }
 
         if (uv1Offset != -1) {
-            var u = vertexBuffer.getShort(pos + uv1Offset);
-            var v = vertexBuffer.getShort(pos + uv1Offset + 2);
+            var u = MemoryUtil.memGetShort(vertexBuffer, pos + uv1Offset);
+            var v = MemoryUtil.memGetShort(vertexBuffer, pos + uv1Offset + 2);
 
             RGBA.toVector4f(sampler1.sampleRaw(u, v, 0, 0), tmpVec4f);
             var alpha = colors[a].w;
@@ -865,15 +836,15 @@ public class SoftRenderPass implements RenderPassBackend {
         }
 
         if (uv2Offset != -1) {
-            var u = Mth.clamp(vertexBuffer.getShort(pos + uv2Offset) / 256f + 0.5f / 16f, 0.5f / 16f, 15.5f / 16f);
-            var v = Mth.clamp(vertexBuffer.getShort(pos + uv2Offset + 2) / 256f + 0.5f / 16f, 0.5f / 16f, 15.5f / 16f);
+            var u = Mth.clamp(MemoryUtil.memGetShort(vertexBuffer, pos + uv2Offset) / 256f + 0.5f / 16f, 0.5f / 16f, 15.5f / 16f);
+            var v = Mth.clamp(MemoryUtil.memGetShort(vertexBuffer, pos + uv2Offset + 2) / 256f + 0.5f / 16f, 0.5f / 16f, 15.5f / 16f);
 
             var color = sampler2.sample(0, 0, u, v, 0, 0);
             colors[a].mul(RGBA.redFloat(color), RGBA.greenFloat(color), RGBA.blueFloat(color), RGBA.alphaFloat(color));
         }
 
         if (this.lineWidthOffset != -1) {
-            lineWidth[a] = vertexBuffer.getFloat(pos + this.lineWidthOffset);
+            lineWidth[a] = MemoryUtil.memGetFloat(vertexBuffer, pos + this.lineWidthOffset);
         } else {
             lineWidth[a] = 1;
         }

@@ -110,7 +110,7 @@ public class RGBA {
     }
 
     private static float from8BitChannel(final int value) {
-        return value / 255.0F;
+        return FLOAT_LOOKUP[value & 0xFF];
     }
 
     public static int colorFromFloatRGBA(float red, float green, float blue, float alpha) {
